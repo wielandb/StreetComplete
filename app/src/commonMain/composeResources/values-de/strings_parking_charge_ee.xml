@@ -1,0 +1,14 @@
+<resources>
+
+    <!-- SCEE parking charge extensions -->
+    <string name="quest_parking_charge_multiple_tariffs">Mehrere Tarife…</string>
+    <string name="quest_parking_charge_custom_interval">Andere Zeitspanne…</string>
+    <string name="quest_parking_charge_tariff_number">Tarif %1$d</string>
+    <string name="quest_parking_charge_add_tariff">Tarif hinzufügen</string>
+    <string name="quest_parking_charge_remove_tariff">Entfernen</string>
+    <string name="quest_parking_charge_tariffs_hint">Trage unabhängig wählbare Parktickets ein, etwa einen Stunden- und einen Tagestarif. Nicht für zeitabhängige Preise oder unterschiedliche Preise für die erste und weitere Stunden verwenden.</string>
+    <string name="quest_parking_charge_complete_all">Trage für jeden Tarif einen positiven Preis und eine Zeitanzahl von 1 bis 9999 ein oder entferne unvollständige Zeilen.</string>
+    <string name="quest_parking_charge_too_long">Die Tarifliste überschreitet die OSM-Grenze von 255 Zeichen und kann so nicht gespeichert werden.</string>
+    <string name="quest_parking_charge_unsupported">Dieses Preisformat oder diese Währung lässt sich hier nicht ohne Informationsverlust bearbeiten. Verwende stattdessen den Tag-Editor.</string>
+
+</resources>

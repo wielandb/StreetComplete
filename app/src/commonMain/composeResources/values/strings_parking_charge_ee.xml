@@ -1,0 +1,14 @@
+<resources>
+
+    <!-- SCEE parking charge extensions -->
+    <string name="quest_parking_charge_multiple_tariffs">Multiple tariffs…</string>
+    <string name="quest_parking_charge_custom_interval">Other billing interval…</string>
+    <string name="quest_parking_charge_tariff_number">Tariff %1$d</string>
+    <string name="quest_parking_charge_add_tariff">Add tariff</string>
+    <string name="quest_parking_charge_remove_tariff">Remove</string>
+    <string name="quest_parking_charge_tariffs_hint">Enter independently available ticket options, such as an hourly ticket and a day ticket. Do not use this for time-dependent prices or different prices for the first and subsequent hours.</string>
+    <string name="quest_parking_charge_complete_all">Enter a positive price and a duration from 1 to 9999 for every tariff, or remove incomplete rows.</string>
+    <string name="quest_parking_charge_too_long">The tariff list exceeds the OSM limit of 255 characters and cannot be saved in this form.</string>
+    <string name="quest_parking_charge_unsupported">This price format or currency cannot be edited with this form without losing information. Use the tag editor instead.</string>
+
+</resources>
