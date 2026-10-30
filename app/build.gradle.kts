@@ -331,6 +331,15 @@ tasks.withType<Test>().configureEach {
     systemProperty("user.timezone", "UTC")
 }
 tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    // Use the fully booted runtime, including trust services, for HTTPS integration tests.
+    standalone.set(false)
+    doFirst {
+        val boot = providers.exec {
+            commandLine("xcrun", "simctl", "bootstatus", device.get(), "-b")
+        }
+        logger.lifecycle(boot.standardOutput.asText.get())
+        boot.result.get().assertNormalExitValue()
+    }
     // simctl passes SIMCTL_CHILD_-prefixed variables on to the simulated process
     environment("SIMCTL_CHILD_TZ", "UTC")
 }

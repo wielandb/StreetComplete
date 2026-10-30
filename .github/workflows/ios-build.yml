@@ -37,9 +37,12 @@ jobs:
           chmod +x gradlew
 
       - name: Run shared tests on the iOS simulator
+        id: native_tests
         run: ./gradlew :app:iosSimulatorArm64Test --console=plain
 
       - name: Build the Swift application and embedded Kotlin framework
+        id: build_app
+        if: ${{ !cancelled() && (steps.native_tests.outcome == 'success' || steps.native_tests.outcome == 'failure') }}
         run: |
           xcodebuild \
             -project iosApp/iosApp.xcodeproj \
@@ -54,6 +57,7 @@ jobs:
             build
 
       - name: Verify the application launches on the iOS simulator
+        if: ${{ !cancelled() && steps.build_app.outcome == 'success' }}
         run: bash .github/scripts/ios-smoke.sh
 
       - name: Preserve native test and build diagnostics

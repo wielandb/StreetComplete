@@ -77,6 +77,18 @@ screenshot/process listing/system log even when launch verification fails. The s
 launch script passes local Bash syntax checking; execution is pending CI.
 This is not release-ready.
 
+The first two Mac runs execute all 2,553 tests: 2,511 pass, 41 fail and one is skipped.
+The failures comprise 37 HTTPS/API checks with simulator TLS errors, two photo-upload tests
+using a repository-relative fixture path unavailable in the simulator, and two iOS time
+formatters interpreting local fields in the device time zone instead of the requested zone.
+Follow-up changes use a fully booted simulator for HTTPS tests, temporary image fixtures,
+and a Gregorian calendar in the formatter's time zone. Two additional cross-zone regression
+cases cover Honolulu and Kiritimati. Windows run 21 also exposes an existing unclosed image
+source: the new fixture cleanup cannot delete uploaded images. The upload implementation
+now closes that source after loading its bytes. These corrections require fresh verification.
+Mac CI preserves failing tests and also attempts the independent Swift build/start checks
+after a native test failure so application diagnostics are not hidden by unrelated tests.
+
 The detailed notes below include historical checkpoints; later verified results supersede earlier
 pending statuses. The required integration checklist retains the complete original scope.
 ## Scope and source revisions

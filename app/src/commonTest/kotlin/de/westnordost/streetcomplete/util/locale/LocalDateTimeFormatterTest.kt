@@ -10,6 +10,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LocalDateTimeFormatterTest {
+    @Test fun `custom time zones preserve local date and clock fields`() {
+        val dateTime = LocalDateTime(2026, 6, 15, 18, 30)
+        for (zone in listOf("Pacific/Honolulu", "Pacific/Kiritimati")) {
+            assertEquals(
+                "15.06.26, 18:30",
+                LocalDateTimeFormatter(Locale("de"), TimeZone.of(zone), DateTimeFormatStyle.Short)
+                    .format(dateTime),
+                zone,
+            )
+        }
+    }
+
     @Test fun format() {
         val german = Locale("de")
         val dateTime = LocalDateTime(LocalDate(1985, 11, 8), LocalTime(18, 30, 24))

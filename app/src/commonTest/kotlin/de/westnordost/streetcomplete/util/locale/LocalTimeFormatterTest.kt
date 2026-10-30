@@ -8,6 +8,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LocalTimeFormatterTest {
+    @Test fun `custom time zones preserve local clock fields`() {
+        for (zone in listOf("Pacific/Honolulu", "Pacific/Kiritimati")) {
+            assertEquals(
+                "12:23",
+                LocalTimeFormatter(Locale("de"), TimeZone.of(zone), DateTimeFormatStyle.Short)
+                    .format(LocalTime(12, 23, 40)),
+                zone,
+            )
+        }
+    }
+
     @Test fun format() {
         val german = Locale("de")
         val time = LocalTime(12, 23, 40)

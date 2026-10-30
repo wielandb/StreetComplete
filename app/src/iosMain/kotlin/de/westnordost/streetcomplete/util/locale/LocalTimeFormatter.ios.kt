@@ -8,6 +8,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toNSDateComponents
 import kotlinx.datetime.toNSTimeZone
 import platform.Foundation.NSCalendar
+import platform.Foundation.NSCalendarIdentifierGregorian
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSDateFormatterNoStyle
 
@@ -22,10 +23,14 @@ actual class LocalTimeFormatter actual constructor(
         it.timeStyle = style.toNSDateFormatterStyle()
         it.timeZone = timeZone.toNSTimeZone()
     }
+    private val calendar = NSCalendar(NSCalendarIdentifierGregorian).apply {
+        this.timeZone = formatter.timeZone
+    }
 
     actual fun format(time: LocalTime): String {
         val dateTime = LocalDateTime(LocalDate(2000, 1, 1), time)
-        val date = NSCalendar.currentCalendar.dateFromComponents(dateTime.toNSDateComponents())
+        val components = dateTime.toNSDateComponents().apply { this.timeZone = formatter.timeZone }
+        val date = calendar.dateFromComponents(components)
             ?: return ""
         return formatter.stringFromDate(date)
     }

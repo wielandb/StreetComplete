@@ -38,7 +38,7 @@ class PhotoServiceApiClientImpl(
                 // we read the whole file into a byte array rather than stream it, see
                 // https://github.com/streetcomplete/StreetComplete/issues/6959 / https://youtrack.jetbrains.com/issue/KTOR-9737
                 // setBody(ByteReadChannel(fileSystem.source(file).buffered()))
-                setBody(fileSystem.source(file).buffered().readByteArray())
+                setBody(fileSystem.source(file).buffered().use { it.readByteArray() })
                 expectSuccess = true
             }
 

@@ -12,17 +12,33 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.IOException
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.serialization.SerializationException
 import kotlin.test.Test
+import kotlin.test.BeforeTest
+import kotlin.test.AfterTest
+import kotlin.random.Random
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class PhotoServiceApiClientImplTest {
 
-    private val picture = "src/commonTest/resources/hai_phong_street.jpg"
     private val fileSystem = SystemFileSystem
+    private val picturePath = Path(SystemTemporaryDirectory, "scee-photo-upload-${Random.nextLong()}.jpg")
+    private val picture = picturePath.toString()
+    private val pictureBytes = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte())
+
+    @BeforeTest fun createPicture() {
+        fileSystem.sink(picturePath).buffered().use { it.write(pictureBytes) }
+    }
+
+    @AfterTest fun deletePicture() {
+        if (fileSystem.exists(picturePath)) fileSystem.delete(picturePath)
+    }
 
     @Test
     fun `upload makes POST request with file contents and returns response`() = runBlocking {
@@ -35,6 +51,7 @@ class PhotoServiceApiClientImplTest {
         assertEquals(HttpMethod.Post, mockEngine.requestHistory[0].method)
         assertEquals("http://example.com/upload.php", mockEngine.requestHistory[0].url.toString())
         assertEquals(ContentType.Image.JPEG, mockEngine.requestHistory[0].body.contentType)
+        assertContentEquals(pictureBytes, mockEngine.requestHistory[0].body.toByteArray())
 
         assertContentEquals(listOf("market.jpg"), response)
     }
