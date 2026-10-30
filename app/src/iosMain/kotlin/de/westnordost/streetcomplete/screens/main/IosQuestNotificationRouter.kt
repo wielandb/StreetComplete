@@ -11,8 +11,11 @@ import platform.darwin.NSObject
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
+/** Expose the Objective-C base type: Swift cannot import Kotlin Objective-C subclasses. */
+fun createQuestNotificationRouter(links: IosAppLinks): NSObject = IosQuestNotificationRouter(links)
+
 /** Swift retains this from app initialization, before iOS delivers a cold-start response. */
-class IosQuestNotificationRouter(private val links: IosAppLinks) : NSObject(), UNUserNotificationCenterDelegateProtocol {
+private class IosQuestNotificationRouter(private val links: IosAppLinks) : NSObject(), UNUserNotificationCenterDelegateProtocol {
     private val previous = UNUserNotificationCenter.currentNotificationCenter().delegate
 
     init {

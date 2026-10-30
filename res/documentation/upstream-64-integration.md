@@ -88,6 +88,15 @@ source: the new fixture cleanup cannot delete uploaded images. The upload implem
 now closes that source after loading its bytes. These corrections require fresh verification.
 Mac CI preserves failing tests and also attempts the independent Swift build/start checks
 after a native test failure so application diagnostics are not hidden by unrelated tests.
+Commit `465f30de3d29e482c7e74de99bc2935dc9c16f67` passes both Android CI and the native
+simulator test step; the latter's framework generation also succeeds. Swift then rejects
+importing the Kotlin Objective-C subclass used as the notification router. The bridge now
+constructs that private subclass through a public Kotlin factory returning `NSObject`,
+which Swift retains through its supported base type. The next Mac run must verify the fix.
+Windows run 22 compiles both native targets and simulator test sources, but its Android host
+suite encounters 37 DNS/network failures (`UnresolvedAddressException`). The image cleanup
+and formatter cases pass there; complete Android CI on the same source passes. Local APK
+assembly is therefore being run independently of the host's network-dependent tests.
 
 The detailed notes below include historical checkpoints; later verified results supersede earlier
 pending statuses. The required integration checklist retains the complete original scope.

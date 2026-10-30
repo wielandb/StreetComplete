@@ -5,13 +5,13 @@ import SwiftUI
 @main
 struct iOSApp: App {
     private let links: IosAppLinks
-    private let notificationRouter: IosQuestNotificationRouter
+    private let notificationRouter: NSObject
 
     init() {
         let links = IosAppLinks()
         self.links = links
         // Register before launch finishes so notification taps also survive a cold start.
-        self.notificationRouter = IosQuestNotificationRouter(links: links)
+        self.notificationRouter = IosQuestNotificationRouterKt.createQuestNotificationRouter(links: links)
         KoinKt.doInitKoin()
     }
 
