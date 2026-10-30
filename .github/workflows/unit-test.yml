@@ -8,12 +8,19 @@ on:
       - "codex/streetcomplete-v64"
   pull_request:
   workflow_dispatch:
+    inputs:
+      apk_run_id:
+        description: "Reuse the scee-debug-apk artifact from this run for an isolated UI check"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   unit-test:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.apk_run_id == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -52,5 +59,47 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
             androidApp/build/outputs/mapping/release/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ui-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.apk_run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the reused application matches this source
+        env:
+          BUILD_RUN_ID: ${{ inputs.apk_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/verify-reused-build.py
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: scee-debug-apk
+          path: androidApp/build/ui-apk
+          run-id: ${{ inputs.apk_run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "25"
+          distribution: temurin
+
+      - name: Exercise the SCEE FixMe quest on Android 37 with 16-KB pages
+        run: bash .github/scripts/android-ui-smoke.sh
+
+      - name: Preserve isolated Android UI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui-verification
+          path: androidApp/build/smoke/
           if-no-files-found: ignore
           retention-days: 14

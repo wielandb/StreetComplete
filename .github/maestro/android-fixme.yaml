@@ -1,0 +1,15 @@
+appId: de.westnordost.streetcomplete.expert.debug
+name: SCEE FixMe quest form without submitting an edit
+---
+- launchApp:
+    permissions:
+      all: allow
+- assertVisible: Menu
+- takeScreenshot: fixme-map
+- tapOn:
+    point: "50%,50%"
+- assertVisible: "(?s).*FixMe:.*"
+- assertVisible: Remove this fixme
+- takeScreenshot: fixme-form
+- back
+- assertVisible: Menu
