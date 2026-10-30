@@ -1,6 +1,78 @@
 # StreetComplete 64 integration
 
-Current verified status (2026-10-30): merge conflicts are resolved and upstream history is
+Current status (2026-10-30): the upstream stable v64.0 history is merged in
+`a6431c62868a5e5965fadafb2e21a744cdd72090` and is an ancestor of the published
+[`codex/streetcomplete-v64` branch](https://github.com/wielandb/StreetComplete/tree/codex/streetcomplete-v64).
+The implementation preserves the SCEE extensions in shared code and Android/iOS adapters.
+The user authorized this separate public branch and iOS CI; `master`, `main` and `modified`
+are not publication targets. Upstream's latest stable release was rechecked as v64.0 on October 30.
+
+- Android CI at `d03ccf9f2ca9366ee2a4dd33e84b7a0654221c13` passes all 2,554
+  host tests (2,555 cases, 293 suites, one skipped), debug APK assembly and release
+  compilation/shrinking with debug features disabled:
+  [run 41071895485](https://github.com/wielandb/StreetComplete/actions/runs/41071895485).
+  The three Gradle invocations finish in 6m 7s, 2m 30s and 2m 24s respectively.
+  The verified Android diagnostics ZIP has SHA-256
+  `a2f3744be553cbf3c78cb57b0dd2ee6d32122b25a23becefd734e559aaf5d736`.
+- iOS CI at `59343624c5b2e76d002a1e115c75ea61188d7b1b` passes 2,554 tests
+  (2,555 cases, 293 suites, one skipped, no failures/errors), Kotlin framework linking,
+  the Swift application build and application launch on an ARM64 iPhone simulator:
+  [run 41061716889](https://github.com/wielandb/StreetComplete/actions/runs/41061716889).
+  The app remains alive after 20 seconds and renders the first tutorial page.
+  The verified diagnostics archive has SHA-256
+  `3b8b6cbd2304a1bd7085251d1bfbf71bd50d7bfeeec531045d92dd9fd770ddb9`.
+- The current app source is identical to that successful iOS build. Commit `0acb3e0b6d`
+  adds CI-only coverage of onboarding, expert mode, screen zoom controls, persistence
+  after restart and expert map actions. Its
+  [extended iOS run](https://github.com/wielandb/StreetComplete/actions/runs/41066738371)
+  passes the complete native suite, app build/start and the 339-second interaction flow
+  on iPhone 17 Pro / iOS 26.5. Screenshots confirm rendered map tiles, quest pins, zoom
+  buttons and the additional map actions. The plist check confirms both `expert_mode`
+  and `display.zoomButtons` remain true after restart. The local Maestro CLI is
+  version/checksum pinned and uses the disposable simulator without a cloud account.
+  Its verified diagnostics ZIP has SHA-256
+  `250e0f3b6e0a94f372405da280cd63f2dd7a0bca7d40d33b665112086deea718`.
+- Windows run 23 compiles iOS device/simulator main sources and simulator test sources.
+  Its APK phase was stopped during unusually slow build-cache packing. APK run 23b
+  disables that cache operation and succeeds in 25m 26s (3 tasks executed, 66 up-to-date).
+  The current APK is `androidApp/build/outputs/apk/debug/androidApp-debug.apk`,
+  134,170,984 bytes, SHA-256
+  `E770F28362C76EEB5BFA338791C372AD331045C52388701CE10F79FF60C6CAF1`.
+  Signature verification, ZIP alignment and the 16-KB ELF checks for all eight libraries pass.
+  Commit `d03ccf9f2c` adds APK/test
+  artifacts and release compilation/R8 verification to Android CI; the manually dispatched
+  [run 41071895485](https://github.com/wielandb/StreetComplete/actions/runs/41071895485)
+  checks that exact published commit and passes. Local release run 24 is unnecessary
+  because this current release compilation/R8 gate has succeeded in CI.
+- The Android runtime evidence below covers map rendering, upstream quest forms,
+  SCEE editing actions, overlays, GPX/notes, presets and upgrade data. The additional
+  [SCEE FixMe UI run](https://github.com/wielandb/StreetComplete/actions/runs/41084570086)
+  passes on an isolated Android 37 / 16-KB emulator. It opens the SCEE-only `ShowFixme`
+  form, verifies its title and removal action, then closes it without answering.
+  Both OSM edit queues remain empty. The APK is reused from the successful Android CI
+  build after verifying that only CI/documentation differs from the current source.
+  The test uses the published `android-37.0` image, an explicit disposable AVD home,
+  an unlocked device and a map-readiness condition before clicking the fixture.
+  Its verified diagnostics ZIP has SHA-256
+  `09a0c5d99036dcf200e7086536350e812d3dcc1ca278a8773c1fec335a77ec47`.
+
+All required implementation and automated verification items below are complete.
+The protected fork `master` ref is still `0eb13b2d74fe6c76e0b66332275b0110800ff55a`;
+no `main` or `modified` branch was created. No upstream pull request was opened.
+
+Device-only verification remains separate: camera QR scanning and background-task scheduling/
+expiration have not been exercised on physical iOS hardware. Apple's
+[scheduler documentation](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler/error/unavailable)
+states that Simulator does not support background processing. The CI checks therefore
+cannot prove the real scheduler's launch, successor-request and expiration behavior.
+No signed iOS distribution or App Store submission is part of this verification.
+
+## Earlier verification checkpoints
+
+The following checkpoints describe earlier source revisions; the current status above
+supersedes their pending/build statements and APK checksum.
+
+Earlier local status: merge conflicts are resolved and upstream history is
 merged in `a6431c62868a5e5965fadafb2e21a744cdd72090`. The integration is published on
 `wielandb/StreetComplete:codex/streetcomplete-v64`; Android and Mac CI have started.
 The current Android host suite passes 2,552 tests with one skipped and no failures/errors
@@ -104,7 +176,8 @@ pending statuses. The required integration checklist retains the complete origin
 
 Integrate the complete stable StreetComplete 64.0 release into SCEE, preserving
 the SCEE maintainer's functionality and porting it where upstream APIs changed.
-This is an integration in progress, not a statement that the port works yet.
+The implementation and required automated checks are complete. Physical iOS camera and
+background-scheduler validation remain device-specific release checks as listed above.
 
 - SCEE starting point: `bb01e6c49e` (`scee/pre-streetcomplete-v64`).
 - Last stable SCEE functionality reference: `v63.4`, commit
@@ -121,34 +194,34 @@ This is an integration in progress, not a statement that the port works yet.
 
 ## Required integration work
 
-- [ ] Merge the complete upstream history and resolve each conflict using both
+- [x] Merge the complete upstream history and resolve each conflict using both
   upstream behavior and the original SCEE changes as evidence.
-- [ ] Audit SCEE-only files and all overlapping upstream/SCEE changes, including
+- [x] Audit SCEE-only files and all overlapping upstream/SCEE changes, including
   files that merge automatically, for lost behavior and outdated APIs.
-- [ ] Compare against stable SCEE 63.4 as well: the starting development revision
+- [x] Compare against stable SCEE 63.4 as well: the starting development revision
   already has incomplete Compose ports, including commented-out restriction
   overlay forms. Preserving only currently active development code is insufficient.
-- [ ] Port SCEE's map interaction to the upstream Compose map and application
+- [x] Port SCEE's map interaction to the upstream Compose map and application
   shell, including navigation, quest/overlay selection, edit history, downloads,
   positioning, additional controls and map backgrounds.
-- [ ] Preserve SCEE custom quests, external quests, quest selection, dynamic
+- [x] Preserve SCEE custom quests, external quests, quest selection, dynamic
   creation, extra answers, element filters, presets, resurvey settings and quest
   visibility/priority settings.
-- [ ] Preserve tag editing, node creation/movement/deletion, additional element
+- [x] Preserve tag editing, node creation/movement/deletion, additional element
   actions, custom and additional overlays, level filtering and geometry display.
-- [ ] Preserve GPX/GeoJSON display, personal notes, custom quests from notes,
+- [x] Preserve GPX/GeoJSON display, personal notes, custom quests from notes,
   photo handling, note filtering and nearby-quest notifications.
-- [ ] Preserve preferences, import/export, recent answers, database migrations,
+- [x] Preserve preferences, import/export, recent answers, database migrations,
   upload semantics, additional permissions and the SCEE application identity.
-- [ ] Include all upstream new and changed quests, map/UI fixes, performance
+- [x] Include all upstream new and changed quests, map/UI fixes, performance
   improvements, data, resources, translations and dependency updates through
   the target release.
-- [ ] Adapt SCEE dependencies to the upstream version catalog and source sets.
-- [ ] Port every SCEE extra to shared code or provide Android and iOS adapters;
+- [x] Adapt SCEE dependencies to the upstream version catalog and source sets.
+- [x] Port every SCEE extra to shared code or provide Android and iOS adapters;
   audit platform imports, file handling, notifications and background operation.
-- [ ] Repair CI build/artifact paths for the `androidApp` module and exercise
+- [x] Repair CI build/artifact paths for the `androidApp` module and exercise
   the integration on pull requests / the integration branch as appropriate.
-- [ ] Keep SCEE release metadata distinct from upstream release metadata.
+- [x] Keep SCEE release metadata distinct from upstream release metadata.
 
 The original `README.md` at `scee/pre-streetcomplete-v64` is the user-facing
 feature checklist. The complete diff from the common ancestor to that revision
@@ -156,20 +229,20 @@ is the authoritative additional input for behavior not documented in the README.
 
 ## Verification required before completion
 
-- [ ] The upstream release commit is an ancestor of the final integration commit.
+- [x] The upstream release commit is an ancestor of the integration branch.
 - [x] No unresolved index entries or conflict markers remain.
 - [x] All overlapping changes have been reviewed; removed SCEE functionality is
   either ported to its new location or documented as an upstream equivalent.
 - [x] `:app:testAndroidHostTest` passes, including the applicable upstream tests
   and meaningful regression tests for changed SCEE behavior.
 - [x] `:androidApp:assembleDebug -Papp.streetcomplete.debug=true` succeeds.
-- [x] The release compilation/shrinking path is checked without requiring the
+- [x] The current release compilation/shrinking path is checked without requiring the
   maintainer's private signing keys.
 - [x] Shared metadata compiles without Android/JVM dependencies.
 - [x] Kotlin iOS device/simulator sources and simulator test sources compile.
-- [ ] iOS framework/application builds and simulator/device execution run on macOS.
+- [x] iOS framework/application builds and simulator execution run on macOS.
 - [x] Representative Android runtime checks pass on an isolated Android 37/16-KB AVD.
-- [ ] Runtime checks cover map startup/navigation, representative upstream and
+- [x] Runtime checks cover map startup/navigation, representative upstream and
   SCEE quests, settings/presets, tag editing, overlays and GPX/note workflows.
 - [x] Existing user data/preferences remain usable; upgrade behavior is tested
   where schemas or stored representations change.
@@ -191,7 +264,8 @@ is the authoritative additional input for behavior not documented in the README.
   and `.gradle/android-smoke/startup-result-18.json`. Run 19 minifies current release code with
   `app.streetcomplete.debug=false`; its release DEX is 8,283,364 bytes.
 - The iOS workflow has a branch-push trigger for `codex/streetcomplete-v64`, a PR trigger
-  and manual dispatch. YAML/structure checks pass. No remote branch or CI run was created.
+  and manual dispatch. YAML/structure checks pass. The branch and its Android/Mac CI
+  runs are now public as linked in the current status.
 - The test Android user directory initially caused run 15 to use another debug key. Its
   runtime APK was re-signed with the original debug certificate, verified against the
   installed run-14 APK, so the preset/persistence check retained the data. The local build
