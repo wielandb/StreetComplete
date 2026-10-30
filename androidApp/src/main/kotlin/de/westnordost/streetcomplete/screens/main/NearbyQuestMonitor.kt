@@ -23,7 +23,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.PendingIntentCompat
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
-import com.russhwolf.settings.ObservableSettings
 import de.westnordost.streetcomplete.ApplicationConstants
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.R
@@ -32,17 +31,17 @@ import de.westnordost.streetcomplete.data.download.Downloader
 import de.westnordost.streetcomplete.data.download.tiles.DownloadedTilesSource
 import de.westnordost.streetcomplete.data.download.tiles.enclosingTilePos
 import de.westnordost.streetcomplete.data.osm.mapdata.LatLon
+import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.data.quest.Quest
 import de.westnordost.streetcomplete.data.quest.VisibleQuestsSource
+import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.util.buildGeoUri
 import de.westnordost.streetcomplete.util.ktx.nowAsEpochMilliseconds
-import de.westnordost.streetcomplete.util.ktx.toast
 import de.westnordost.streetcomplete.util.logs.Log
 import de.westnordost.streetcomplete.util.math.distanceTo
 import de.westnordost.streetcomplete.util.math.enclosingBoundingBox
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.koin.android.ext.android.inject
 import org.koin.core.component.KoinComponent
 import kotlin.math.max
@@ -50,7 +49,7 @@ import kotlin.math.max
 class NearbyQuestMonitor : Service(), LocationListener, KoinComponent {
 
     private val locationManager: LocationManager by lazy { applicationContext.getSystemService(LOCATION_SERVICE) as LocationManager }
-    private val prefs: ObservableSettings by inject()
+    private val prefs: Preferences by inject()
     private val visibleQuestsSource: VisibleQuestsSource by inject()
     private val downloadController: DownloadController by inject()
     private val downloader: Downloader by inject()
@@ -63,13 +62,14 @@ class NearbyQuestMonitor : Service(), LocationListener, KoinComponent {
     private fun getQuestFoundNotification(size: Int, closest: Quest): Notification =
         NotificationCompat.Builder(this, FOUND_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_app_notification)
-            .setContentTitle(getString(R.string.quest_monitor_found, size))
+            .setContentTitle(getRes(Res.string.quest_monitor_found, size))
             .setContentText(getRes(closest.type.title))
             .setContentIntent(intent(closest.position))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .build()
 
-    private fun getRes(res: StringResource) = runBlocking { org.jetbrains.compose.resources.getString(getSystemResourceEnvironment(), res) }
+    private fun getRes(res: StringResource, vararg args: Any) =
+        runBlocking { org.jetbrains.compose.resources.getString(res, *args) }
 
     private fun intent(position: LatLon): PendingIntent? {
         val intent = Intent(this, MainActivity::class.java)
@@ -86,13 +86,13 @@ class NearbyQuestMonitor : Service(), LocationListener, KoinComponent {
         if (manager.getNotificationChannelCompat(MONITOR_CHANNEL_ID) == null)
             manager.createNotificationChannel(
                 NotificationChannelCompat.Builder(MONITOR_CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_LOW)
-                    .setName(getString(R.string.quest_monitor_channel_name))
+                    .setName(getRes(Res.string.quest_monitor_channel_name))
                     .build()
             )
         if (manager.getNotificationChannelCompat(FOUND_CHANNEL_ID) == null)
             manager.createNotificationChannel(
                 NotificationChannelCompat.Builder(FOUND_CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_HIGH)
-                    .setName(getString(R.string.quest_monitor_channel_name_found))
+                    .setName(getRes(Res.string.quest_monitor_channel_name_found))
                     .setVibrationEnabled(true)
                     .build()
             )
@@ -103,7 +103,7 @@ class NearbyQuestMonitor : Service(), LocationListener, KoinComponent {
             val notification = NotificationCompat.Builder(this, MONITOR_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_app_notification)
                 .setContentTitle(if (ApplicationConstants.DEBUG) "SCEE Dev" else "SCEE")
-                .setContentText(getString(R.string.quest_monitor_running))
+                .setContentText(getRes(Res.string.quest_monitor_running))
                 .setContentIntent(pi)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .build()
@@ -121,11 +121,11 @@ class NearbyQuestMonitor : Service(), LocationListener, KoinComponent {
             locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 0L, 0.0f, this)
         } catch (e: SecurityException) {
             // there is some foreground issue, and of course location permissions
-            this.toast(R.string.quest_monitor_error, Toast.LENGTH_LONG)
+            Toast.makeText(this, getRes(Res.string.quest_monitor_error), Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             // there is also ForegroundServiceNotAllowedException that can occur, didn't bother investigating details...
             // catch other exceptions because ForegroundServiceNotAllowedException is only available on API 31 and up
-            this.toast(R.string.quest_monitor_error, Toast.LENGTH_LONG)
+            Toast.makeText(this, getRes(Res.string.quest_monitor_error), Toast.LENGTH_LONG).show()
         }
         return Binder()
     }
@@ -189,4 +189,4 @@ private const val FOUND_NOTIFICATION_ID = 16540685
 private const val MONITOR_CHANNEL_ID = "quest_monitor"
 private const val FOUND_CHANNEL_ID = "quest_found"
 
-private fun Location.toLatLon() = LatLon(longitude, longitude)
+private fun Location.toLatLon() = LatLon(latitude, longitude)

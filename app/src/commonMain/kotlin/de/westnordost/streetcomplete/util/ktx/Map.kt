@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.util.ktx
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 /** Return whether this map contains the given [other] completely */
 fun <X, Y> Map<X, Y>.containsAll(other: Map<X, Y>) = other.all { this[it.key] == it.value }
 
@@ -10,5 +12,5 @@ fun <K, V> Map<K, V>.containsAnyKey(vararg keys: K): Boolean = keys.any { this.k
 // could save (noticeably!) more by using ArrayMap, but this slows down quest creation by ca. 15%
 fun Map<String, String>.toInternedMap() = if (isEmpty()) emptyMap()
     else HashMap<String, String>(size, 0.9f).also {
-        forEach { (k, v) -> it[k.intern()] = v.intern() }
+        forEach { (k, v) -> it[k.internString()] = v.internString() }
     }

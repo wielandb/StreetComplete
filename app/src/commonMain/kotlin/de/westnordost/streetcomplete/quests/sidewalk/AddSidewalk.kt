@@ -56,7 +56,7 @@ class AddSidewalk : OsmElementQuestType<Sides<Sidewalk>> {
      */
     private val untaggedRoadsFilter by lazy { """
         ways with
-          highway ~ motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential
+          highway ~ ${prefs.getString(questPrefix(prefs) + PREF_SIDEWALK_HIGHWAY_SELECTION, ROADS_WITH_SIDEWALK.joinToString("|"))}
           and !sidewalk and !sidewalk:both and !sidewalk:left and !sidewalk:right
           and (!maxspeed or maxspeed > 9 or maxspeed ~ [A-Z].*)
           and surface !~ ${UNPAVED_SURFACES.joinToString("|")}
@@ -98,12 +98,14 @@ class AddSidewalk : OsmElementQuestType<Sides<Sidewalk>> {
 
     @Composable
     override fun Form(on: (QuestAction<Sides<Sidewalk>>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
-        AddSidewalkForm(on, geometry, countryInfo)
+        AddSidewalkForm(on, element, geometry, countryInfo)
     }
 
     override fun applyAnswerTo(answer: Sides<Sidewalk>, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
         answer.applyTo(tags)
     }
+
+    override val hasQuestSettings = true
 
     // min distance selection or element selection
     @Composable

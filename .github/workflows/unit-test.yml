@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - "master"
+      - "modified"
+      - "codex/streetcomplete-v64"
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   unit-test:
@@ -12,13 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up JDK 21
+      - name: set up JDK 25
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "25"
+          distribution: "temurin"
 
       - uses: gradle/actions/setup-gradle@v3
 
       - name: Run unit tests with Gradle
         run: ./gradlew :app:testAndroidHostTest
+
+      - name: Build debug APK
+        run: ./gradlew :androidApp:assembleDebug -Papp.streetcomplete.debug=true

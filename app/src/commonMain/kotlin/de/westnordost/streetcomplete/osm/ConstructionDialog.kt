@@ -19,10 +19,9 @@ import de.westnordost.streetcomplete.util.ktx.toLocalDate
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
-import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.format.MonthNames
+import kotlinx.datetime.format.char
 import org.jetbrains.compose.resources.stringResource
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun ConstructionDialog(
@@ -43,8 +42,8 @@ fun ConstructionDialog(
             // for short construction up to a few months it's better to use conditional access
             // as per https://wiki.openstreetmap.org/wiki/Tag:highway%3Dconstruction
             if (diff < 200) { // we arbitrarily set the few months to 200 days
-                val f = DateTimeFormatter.ofPattern("MMM dd yyyy", Locale.US)
-                builder["access:conditional"] = "no @ (${f.format(today.toJavaLocalDate())}-${f.format(finishDate.toJavaLocalDate())})"
+
+                builder["access:conditional"] = "no @ (${constructionDateFormat.format(today)}-${constructionDateFormat.format(finishDate)})"
                 onEdit(builder.create())
             } else {
                 // if we actually change the highway to construction, we let the user set a construction value
@@ -64,12 +63,20 @@ fun ConstructionDialog(
             text = constructionValueAndFinishDate!!.first,
             onConfirmed = {
                 val builder = StringMapChangesBuilder(element.tags)
-                val f = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
-                builder["opening_date"] = f.format(constructionValueAndFinishDate!!.second.toJavaLocalDate())
+
+                builder["opening_date"] = constructionValueAndFinishDate!!.second.toString()
                 builder["highway"] = "construction"
                 builder["construction"] = it
                 onEdit(builder.create())
             }
         )
     }
+}
+
+private val constructionDateFormat = LocalDate.Format {
+    monthName(MonthNames.ENGLISH_ABBREVIATED)
+    char(' ')
+    day()
+    char(' ')
+    year()
 }

@@ -16,7 +16,6 @@ import de.westnordost.streetcomplete.data.upload.UploadController
 import de.westnordost.streetcomplete.data.user.UserLoginSource
 import de.westnordost.streetcomplete.data.visiblequests.TeamModeQuestFilterSource
 import de.westnordost.streetcomplete.util.ktx.format
-import de.westnordost.streetcomplete.util.ktx.updatesWithPermissionChanges
 import de.westnordost.streetcomplete.util.logs.Log
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -110,9 +109,17 @@ class AutoSyncer(
                 }
             }
         }
+        // also try once on start, in case there are pending changes that haven't been uploaded
+        // during the last session because the last session was offline
+        triggerAutoUpload()
+
         coroutineScope.launch {
-            val request = LocationRequest(LocationAccuracy.High, 30.seconds, 100.meters)
-            locationProvider.updatesWithPermissionChanges(request).collect { locationEvent ->
+            val request = LocationRequest {
+                accuracy = LocationAccuracy.High
+                minimumInterval = 30.seconds
+                minimumDistance = 100.meters
+            }
+            locationProvider.updates(request).collect { locationEvent ->
                 if (locationEvent is LocationEvent.Update) {
                     val (position, accuracy) = locationEvent.measurement
                     if (accuracy == null || accuracy < 300.meters) {

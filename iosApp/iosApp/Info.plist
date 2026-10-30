@@ -2,13 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleDisplayName</key>
+    <string>SCEE</string>
+
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
-        <string>app.streetcomplete.cleanup</string>
+        <string>de.westnordost.streetcomplete.expert.cleanup</string>
     </array>
     <key>UIBackgroundModes</key>
     <array>
         <string>processing</string>
+        <string>location</string>
     </array>
 
 	<key>CADisableMinimumFrameDurationOnPhone</key>
@@ -20,7 +27,7 @@
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>CFBundleURLName</key>
-            <string>de.westnordost.streetcomplete</string>
+            <string>de.westnordost.streetcomplete.expert</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>streetcomplete</string>
@@ -29,7 +36,42 @@
         </dict>
     </array>
 
-	<key>LSApplicationQueriesSchemes</key>
+	    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>GPX track</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key><array><string>com.topografix.gpx</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>GeoJSON geometry</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key><array><string>public.geojson</string><string>public.json</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>SCEE custom quests and tree data</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key><array><string>public.plain-text</string><string>public.comma-separated-values-text</string></array>
+        </dict>
+    </array>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.topografix.gpx</string>
+            <key>UTTypeDescription</key><string>GPX track</string>
+            <key>UTTypeConformsTo</key><array><string>public.xml</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key><array><string>gpx</string></array>
+                <key>public.mime-type</key><string>application/gpx+xml</string>
+            </dict>
+        </dict>
+    </array>
+    <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+    <key>LSApplicationQueriesSchemes</key>
     <array>
         <string>gomaposm</string><!-- see https://github.com/bryceco/GoMap/blob/d52d52ed9ae2ba6a44c859fc559e0e2513136341/src/iOS/Go%20Map!!-Info.plist#L95 -->
         <string>osmandmaps</string><!-- https://github.com/osmandapp/OsmAnd-iOS/blob/2e6202f7cd7114aee532f77a8ab277f9bd1c2e62/Resources/OsmAnd-Info.plist#L162 -->
@@ -43,6 +85,6 @@
     <string>Precise location permission is needed to show your position on the map and download data in your vicinity.</string>
 
     <key>NSCameraUsageDescription</key>
-    <string>Camera permission is needed to attach photos to map notes.</string>
+    <string>Camera permission is needed to attach photos to map notes and scan QR codes.</string>
 </dict>
 </plist>

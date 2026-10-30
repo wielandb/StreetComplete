@@ -8,7 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.core.net.toUri
+import io.ktor.http.Url
+import io.ktor.http.decodeURLPart
 import de.westnordost.streetcomplete.data.elementfilter.toElementFilterExpression
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
@@ -35,7 +36,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-import java.util.Locale
 
 class AddEvseId : OsmElementQuestType<String> {
 
@@ -136,7 +136,7 @@ class AddEvseId : OsmElementQuestType<String> {
 
         val normalized = answer
             .split(";")
-            .map { it.trim().uppercase(Locale.ROOT) }
+            .map { it.trim().uppercase() }
             .filter { it.isNotEmpty() }
             .joinToString(";")
 
@@ -165,23 +165,27 @@ private val urlPrefixesWithEvseIdAsPath = arrayOf(
 
 private suspend fun followRedirect(url: String): String? {
     val client = HttpClient { followRedirects = false }
-    val response: HttpResponse = client.request(url) {
-        method = HttpMethod.Head
+    return try {
+        val response: HttpResponse = client.request(url) {
+            method = HttpMethod.Head
+        }
+        response.headers[HttpHeaders.Location]
+    } finally {
+        client.close()
     }
-    return response.headers[HttpHeaders.Location]
 }
 
 // Some of the QR codes contain a URL that is missing the protocol.
 private fun normalizeUrl(url: String): String = if (url.startsWith("http")) url else "https://$url"
 
 private fun getUrlQueryParameter(url: String, queryParameter: String): String? {
-    val uri = normalizeUrl(url).toUri()
-    return uri.getQueryParameter(queryParameter)
+    val uri = Url(normalizeUrl(url))
+    return uri.parameters[queryParameter]
 }
 
 private fun getUrlPath(url: String): String? {
-    val uri = normalizeUrl(url).toUri()
-    return uri.path?.replace("/", "")
+    val uri = Url(normalizeUrl(url))
+    return uri.encodedPath.decodeURLPart().replace("/", "")
 }
 
 private suspend fun parseQrCodeValue(value: String): String? {

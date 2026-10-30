@@ -1,10 +1,5 @@
 package de.westnordost.streetcomplete.ui.common.quest
 
-import android.app.Activity.RESULT_OK
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
@@ -18,6 +13,10 @@ import androidx.compose.ui.Modifier
 import de.westnordost.streetcomplete.data.osm.osmquests.QuestAction
 import de.westnordost.streetcomplete.resources.Res
 import de.westnordost.streetcomplete.resources.no_qr_code_handler
+import de.westnordost.streetcomplete.resources.qr_scan_permission_required
+import de.westnordost.streetcomplete.resources.qr_camera_unavailable
+import de.westnordost.streetcomplete.ui.util.qr.QrScanResult
+import de.westnordost.streetcomplete.ui.util.qr.rememberQrCodeScanner
 import de.westnordost.streetcomplete.ui.common.ToastPopup
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -40,24 +39,23 @@ fun MultiValueQuestQrScanForm(
     hint: String? = null
 ) {
     var values by rememberSaveable { mutableStateOf(setOf<String>()) }
-    var showNoQrCodeHandlerToast by remember { mutableStateOf(false) }
+    var qrError by remember { mutableStateOf<StringResource?>(null) }
 
-    val qrLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        result ->
-            if (result.resultCode == RESULT_OK) {
-                val content = result.data?.getStringExtra("SCAN_RESULT")
-                if (!content.isNullOrBlank()) {
-                    if (onQrCodeParsed != null) {
-                        onQrCodeParsed(content) {
-                            if (it != null) values = values + it
-                        }
-                    } else {
-                         values = values + content
-                    }
+    val qrScanner = rememberQrCodeScanner { result ->
+        when (result) {
+            is QrScanResult.Success -> {
+                if (onQrCodeParsed != null) {
+                    onQrCodeParsed(result.text) { if (it != null) values = values + it }
+                } else {
+                    values = values + result.text
                 }
             }
+            QrScanResult.Cancelled -> Unit
+            QrScanResult.Unavailable -> qrError = noQrCodeHandlerResId
+            QrScanResult.CameraUnavailable -> qrError = Res.string.qr_camera_unavailable
+            QrScanResult.PermissionDenied -> qrError = Res.string.qr_scan_permission_required
+        }
     }
-
     MultiValueQuestForm(
         on = on,
         values = values,
@@ -73,21 +71,15 @@ fun MultiValueQuestQrScanForm(
         hint = hint
     ) {
         TextButton(
-            onClick = {
-                try {
-                    qrLauncher.launch(Intent("com.google.zxing.client.android.SCAN"))
-                } catch (_: ActivityNotFoundException) {
-                    showNoQrCodeHandlerToast = true
-                }
-            }
+            onClick = qrScanner::scan
         ) {
             Text(stringResource(scanAnotherValueText))
         }
 
-        if (showNoQrCodeHandlerToast) {
+        qrError?.let { error ->
             ToastPopup(
-                onDismissRequest = { showNoQrCodeHandlerToast = false },
-                text = stringResource(noQrCodeHandlerResId),
+                onDismissRequest = { qrError = null },
+                text = stringResource(error),
             )
         }
     }

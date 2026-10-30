@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.SharedPreferencesSettings
+import de.westnordost.streetcomplete.data.preferences.SnapshotSettings
 import de.westnordost.osmfeatures.FeatureDictionary
 import de.westnordost.osmfeatures.create
 import de.westnordost.streetcomplete.data.AndroidPeriodicCleaner
@@ -18,17 +19,13 @@ import de.westnordost.streetcomplete.data.download.AndroidDownloadController
 import de.westnordost.streetcomplete.data.download.DownloadController
 import de.westnordost.streetcomplete.data.download.DownloadWorker
 import de.westnordost.streetcomplete.data.initialize
+import de.westnordost.streetcomplete.data.maptiles.MapLibreMapTilesDownloader
 import de.westnordost.streetcomplete.data.maptiles.MapTilesDownloader
-import de.westnordost.streetcomplete.data.maptiles.MapTilesDownloaderAndroid
 import de.westnordost.streetcomplete.data.upload.AndroidUploadController
 import de.westnordost.streetcomplete.data.upload.UploadController
 import de.westnordost.streetcomplete.data.upload.UploadWorker
 import de.westnordost.streetcomplete.screens.about.AndroidAppStoreInfo
 import de.westnordost.streetcomplete.screens.about.AppStoreInfo
-import de.westnordost.streetcomplete.screens.main.AndroidEmailAppLauncher
-import de.westnordost.streetcomplete.screens.main.AndroidMapAppLauncher
-import de.westnordost.streetcomplete.screens.main.EmailAppLauncher
-import de.westnordost.streetcomplete.screens.main.MapAppLauncher
 import de.westnordost.streetcomplete.ui.util.measure.AndroidArSupportChecker
 import de.westnordost.streetcomplete.ui.util.measure.ArSupportChecker
 import de.westnordost.streetcomplete.util.error_reporting.CrashReportHolder
@@ -44,9 +41,11 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 import org.maplibre.compose.location.AndroidLocationProvider
-import org.maplibre.compose.location.AndroidSystemSettingsLauncher
 import org.maplibre.compose.location.LocationProvider
-import org.maplibre.compose.location.SystemSettingsLauncher
+import org.maplibre.compose.map.MapRuntime
+import org.maplibre.compose.map.createMapRuntime
+import org.maplibre.compose.offline.offlineStorage
+import org.maplibre.compose.util.ExperimentalMaplibreComposeApi
 
 private const val COMPOSE_FILES_DIR = "composeResources/de.westnordost.streetcomplete.resources/files"
 
@@ -97,11 +96,14 @@ val androidModule = module {
     // location
 
     factory<LocationProvider> { AndroidLocationProvider(get()) }
-    factory<SystemSettingsLauncher> { AndroidSystemSettingsLauncher(get()) }
 
     // settings
 
-    single<ObservableSettings> { SharedPreferencesSettings.Factory(androidContext()).create() }
+    single<ObservableSettings> {
+        val context = androidContext()
+        val legacy = context.getSharedPreferences(context.packageName + "_preferences", Context.MODE_PRIVATE)
+        SnapshotSettings(SharedPreferencesSettings(legacy)) { legacy.all }
+    }
 
     // sound
 
@@ -110,6 +112,15 @@ val androidModule = module {
     // connection availability
 
     factory<ActiveNetworkConnection> { AndroidActiveNetworkConnection(androidContext()) }
+
+    // map
+
+    single<MapRuntime> {
+        // the MapLibre Android SDK default instead of the MapLibre Compose one, to keep offline data
+        // from before v64
+        @OptIn(ExperimentalMaplibreComposeApi::class)
+        createMapRuntime { cacheFile = Path(androidContext().filesDir.path, "mbgl-offline.db") }
+    } onClose { it?.close() }
 
     // background jobs
 
@@ -122,5 +133,10 @@ val androidModule = module {
     factory<PeriodicCleaner> { AndroidPeriodicCleaner(androidContext()) }
     worker { CleanerWorker(get(), get(), get()) }
 
-    factory<MapTilesDownloader> { MapTilesDownloaderAndroid(androidContext()) }
+    factory<MapTilesDownloader> {
+        MapLibreMapTilesDownloader(
+            get<MapRuntime>().offlineStorage,
+            androidContext().resources.displayMetrics.density
+        )
+    }
 }

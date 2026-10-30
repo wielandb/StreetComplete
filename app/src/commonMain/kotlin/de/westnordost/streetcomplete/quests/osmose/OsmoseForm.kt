@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +33,12 @@ import de.westnordost.streetcomplete.ui.common.dialogs.AlertDialog
 import de.westnordost.streetcomplete.ui.common.dialogs.ConfirmationDialog
 import de.westnordost.streetcomplete.ui.common.quest.AnswerItem
 import de.westnordost.streetcomplete.ui.common.quest.LocalElement
+import de.westnordost.streetcomplete.ui.common.quest.LocalMapMarkersCallback
+import de.westnordost.streetcomplete.ui.common.quest.Marker
+import de.westnordost.streetcomplete.ui.util.rememberSerializable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
 import de.westnordost.streetcomplete.ui.common.quest.QuestForm
 import de.westnordost.streetcomplete.util.nameAndLocationLabel
 import org.jetbrains.compose.resources.stringResource
@@ -37,26 +48,40 @@ import org.koin.compose.koinInject
 fun OsmoseForm(on: (ExternalAction) -> Unit, quest: ExternalSourceQuest) {
     val osmoseDao: OsmoseDao = koinInject()
     val questController: ExternalSourceQuestController = koinInject()
-    val issue = remember { osmoseDao.getIssue(quest.key.id) }
+    val mapDataSource: MapDataWithEditsSource = koinInject()
+    val issue = remember(quest.key) { osmoseDao.getIssue(quest.key.id) }
     if (issue == null) {
-        questController.delete(quest.key)
-        on(Action.TempHideQuest)
+        LaunchedEffect(quest.key) {
+            questController.delete(quest.key)
+            on(Action.TempHideQuest)
+        }
         return
     }
-    //if (issue.elements.size > 1) viewLifecycleScope.launch { highlightElements() } todo
+    val setMarkers by rememberUpdatedState(LocalMapMarkersCallback.current)
+    val markers by produceState<List<Marker>>(emptyList(), issue.elements, mapDataSource) {
+        value = if (issue.elements.size <= 1) emptyList() else withContext(Dispatchers.IO) {
+            issue.elements.mapNotNull { key ->
+                mapDataSource.getGeometry(key.type, key.id)?.let {
+                    Marker(it, title = "${key.type} ${key.id}")
+                }
+            }
+        }
+    }
+    LaunchedEffect(markers) { setMarkers?.invoke(markers) }
+    DisposableEffect(quest.key) { onDispose { setMarkers?.invoke(emptyList()) } }
     val featureDictionary: FeatureDictionary = koinInject()
-    var confirmFalsePositive by remember { mutableStateOf(false) }
-    var editTags by remember { mutableStateOf(false) }
-    var elementToEdit by remember { mutableStateOf<ElementKey?>(null) }
-    var showIgnoreDialog by remember { mutableStateOf(false) }
+    var confirmFalsePositive by rememberSaveable(quest.key) { mutableStateOf(false) }
+    var editTags by rememberSaveable(quest.key) { mutableStateOf(false) }
+    var elementToEdit by rememberSerializable(quest.key) { mutableStateOf<ElementKey?>(null) }
+    var showIgnoreDialog by rememberSaveable(quest.key) { mutableStateOf(false) }
     if (elementToEdit != null) {
-        val mapDataSource: MapDataWithEditsSource = koinInject()
         val element = mapDataSource.get(elementToEdit!!.type, elementToEdit!!.id)
         if (element == null) elementToEdit = null
         else EditTagsForm(
             { on(EditElement(UpdateElementTagsAction(element, it))); osmoseDao.setDone(issue.uuid); on(Action.TempHideQuest) },
             { elementToEdit = null },
-            element
+            element,
+            elementGeometry = mapDataSource.getGeometry(element.type, element.id) ?: quest.geometry,
         )
     }
     if (elementToEdit == null) {
@@ -144,24 +169,3 @@ fun OsmoseForm(on: (ExternalAction) -> Unit, quest: ExternalSourceQuest) {
         )
     }
 }
-
-/*
-    private fun highlightElements() {
-        val issue = issue ?: return
-        val elementsAndGeometry = issue.elements.mapNotNull { mapDataSource.get(it.type, it.id) }.mapNotNull { e -> mapDataSource.getGeometry(e.type, e.id)?.let { e to it } }
-
-        if (prefs.getBoolean(Prefs.SHOW_WAY_DIRECTION, false) && elementsAndGeometry.any { it.second is ElementPolylinesGeometry }) {
-            // show geometry containing way direction together with normal one. not nice looking, but:
-            //  normal one contains way labels, which are necessary for editing
-            //  this here contains the arrows
-            // and adding arrows to "normal" highlighted ways in special cases only is maybe work for later
-            val mapFragment = (activity as? MainActivity)?.supportFragmentManager?.fragments?.filterIsInstance<MainMapFragment>()?.singleOrNull()
-            mapFragment?.highlightGeometries(elementsAndGeometry.map { it.second })
-        }
-
-        val showsGeometryMarkersListener = activity as? ShowsGeometryMarkers ?: return
-        showsGeometryMarkersListener.putMarkersForCurrentHighlighting(elementsAndGeometry.map {
-            Marker(it.second, null, "${it.first.type} ${it.first.id}")
-        })
-    }
- */

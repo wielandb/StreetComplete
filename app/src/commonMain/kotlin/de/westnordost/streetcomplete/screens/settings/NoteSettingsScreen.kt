@@ -43,23 +43,26 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readString
 import io.github.vinceglb.filekit.sink
 import io.github.vinceglb.filekit.source
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import de.westnordost.streetcomplete.util.ArchiveSource
+import de.westnordost.streetcomplete.util.writeZipArchive
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import kotlinx.io.asInputStream
-import kotlinx.io.asOutputStream
 import kotlinx.io.buffered
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 @Composable
 fun NoteSettingsScreen(
     onClickBack: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope { Dispatchers.IO }
+    val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<StringResource?>(null) }
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
@@ -110,93 +113,58 @@ fun NoteSettingsScreen(
                 name = stringResource(Res.string.pref_hide_notes_title),
                 onClick = { showHideNotesDialog = true },
             )
-            suspend fun saveGpxNotes(file: PlatformFile) {
-                val os = file.sink().buffered().asOutputStream()
-                try {
-                    // read gpx and extract images
+            suspend fun saveGpxNotes(file: PlatformFile) = withContext(Dispatchers.IO) {
+                gpxNotesMutex.withLock {
                     val files = mutableListOf(gpxNotesFile)
                     val gpxText = gpxNotesFile.readString()
                     val picturesDir = FileKit.filesDir
-                    // get all files in pictures dir and check whether they occur in gpxText
                     if (picturesDir.isDirectory()) {
-                        picturesDir.list().forEach {
-                            if (!it.isDirectory() && it.extension == "jpg" && gpxText.contains(it.name))
-                                files.add(it)
+                        files += picturesDir.list().filter {
+                            !it.isDirectory() && it.extension == "jpg" && gpxText.contains(it.name)
                         }
                     }
-                    gpxNotesDir.list().forEach {
-                        if (it.name.startsWith("track_") && it.extension == "gpx" && gpxText.contains(it.name))
-                            files.add(it)
+                    files += gpxNotesDir.list().filter {
+                        it.name.startsWith("track_") && it.extension == "gpx" && gpxText.contains(it.name)
                     }
-
-                    // write files to zip
-                    val zipStream = ZipOutputStream(os)
-                    files.forEach {
-                        val fileStream = it.source().buffered().asInputStream().buffered()
-                        zipStream.putNextEntry(ZipEntry(it.name))
-                        fileStream.copyTo(zipStream, 1024)
-                        fileStream.close()
-                        zipStream.closeEntry()
-                    }
-                    zipStream.close()
-                    files.forEach { it.delete() }
-                } catch (_: Exception) {
-                    error = Res.string.pref_save_file_error
+                    exportArchive(file, files)
                 }
-                os.close()
             }
             Preference(
                 name = stringResource(Res.string.pref_save_gpx),
                 onClick = {
                     if (gpxNotesFile.exists()) {
                         scope.launch {
-                            val file = FileKit.openFileSaver("notes", defaultExtension = "zip")
-                            if (file != null) saveGpxNotes(file)
+                            try {
+                                val file = FileKit.openFileSaver("notes", defaultExtension = "zip")
+                                if (file != null) saveGpxNotes(file)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                error = Res.string.pref_save_file_error
+                            }
                         }
                     } else {
                         error = Res.string.pref_files_not_found
                     }
                 },
             )
-            suspend fun saveFullSizePhotos(file: PlatformFile) {
-                val os = file.sink().buffered().asOutputStream()
-                try {
-                    val files = mutableListOf<PlatformFile>()
-                    val picturesDir = fullSizePhotosDir
-                    // get all files in pictures dir
-                    if (picturesDir.isDirectory()) {
-                        picturesDir.list().forEach {
-                            if (!it.isDirectory()) files.add(it)
-                        }
-                    }
-                    else { // we checked for this, but better be sure
-                        error = Res.string.pref_files_not_found
-                        return
-                    }
-
-                    // write files to zip
-                    val zipStream = ZipOutputStream(os)
-                    files.forEach {
-                        val fileStream = it.source().buffered().asInputStream().buffered()
-                        zipStream.putNextEntry(ZipEntry(it.name))
-                        fileStream.copyTo(zipStream, 1024)
-                        fileStream.close()
-                        zipStream.closeEntry()
-                    }
-                    zipStream.close()
-                    files.forEach { it.delete() }
-                } catch (e: Exception) {
-                    error = Res.string.pref_save_file_error
-                }
-                os.close()
+            suspend fun saveFullSizePhotos(file: PlatformFile) = withContext(Dispatchers.IO) {
+                val files = fullSizePhotosDir.list().filterNot { it.isDirectory() }
+                exportArchive(file, files)
             }
             Preference(
                 name = stringResource(Res.string.pref_get_photos_title),
                 onClick = {
                     if (fullSizePhotosDir.exists() && fullSizePhotosDir.isDirectory() && fullSizePhotosDir.list().isNotEmpty()) {
                         scope.launch {
-                            val file = FileKit.openFileSaver("full_photos", defaultExtension = "zip")
-                            if (file != null) saveFullSizePhotos(file)
+                            try {
+                                val file = FileKit.openFileSaver("full_photos", defaultExtension = "zip")
+                                if (file != null) saveFullSizePhotos(file)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                error = Res.string.pref_save_file_error
+                            }
                         }
                     } else {
                         error = Res.string.pref_files_not_found
@@ -225,8 +193,18 @@ fun NoteSettingsScreen(
         ToastPopup({ error = null }, stringResource(error!!))
 }
 
-val gpxNotesDir = PlatformFile(FileKit.filesDir, "gpx_notes")
+val gpxNotesDir get() = PlatformFile(FileKit.filesDir, "gpx_notes")
 
-val gpxNotesFile = PlatformFile(gpxNotesDir, "notex.gpx")
+val gpxNotesFile get() = PlatformFile(gpxNotesDir, "notex.gpx")
 
-val fullSizePhotosDir = PlatformFile(FileKit.filesDir, "full_photos")
+val fullSizePhotosDir get() = PlatformFile(FileKit.filesDir, "full_photos")
+
+internal val gpxNotesMutex = Mutex()
+
+private suspend fun exportArchive(target: PlatformFile, files: List<PlatformFile>) {
+    target.sink().buffered().use { sink ->
+        writeZipArchive(sink, files.map { file -> ArchiveSource(file.name) { file.source().buffered() } })
+    }
+    // Keep every original until the archive, including its final directory, has been closed.
+    files.forEach { it.delete() }
+}

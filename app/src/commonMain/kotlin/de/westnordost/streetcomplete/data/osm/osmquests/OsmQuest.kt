@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.data.osm.osmquests
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.geometry.ElementPolylinesGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.ElementType
@@ -17,7 +19,7 @@ data class OsmQuest(
     override val geometry: ElementGeometry
 ) : Quest(), OsmQuestDaoEntry {
 
-    override val key: OsmQuestKey = OsmQuestKey(elementType, elementId, questTypeName.intern())
+    override val key: OsmQuestKey = OsmQuestKey(elementType, elementId, questTypeName.internString())
 
     override val questTypeName: String get() = type.name
 

@@ -11,19 +11,16 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.github.difflib.text.DiffRow.Tag
-import com.github.difflib.text.DiffRowGenerator
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmElementQuestType
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.Prefs
@@ -33,15 +30,17 @@ import de.westnordost.streetcomplete.data.osm.osmquests.OsmFilterQuestType
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmQuestController
 import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.ui.common.ToastPopup
+import de.westnordost.streetcomplete.ui.common.HtmlText
 import de.westnordost.streetcomplete.ui.common.dialogs.InfoDialog
 import de.westnordost.streetcomplete.ui.common.dialogs.ScrollableAlertDialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import java.util.regex.PatternSyntaxException
 import kotlin.time.Duration.Companion.seconds
 
 // restarts are typically necessary on changes of element selection because the filter is created by lazy
@@ -72,8 +71,7 @@ fun getPrefixedLabelSourcePref(questType: OsmElementQuestType<*>, prefs: Prefere
         onDismissRequest = onDismissRequest,
         content = {
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(
-                    text = AnnotatedString.fromHtml(stringResource(Res.string.quest_settings_dot_labels_message)),
+                HtmlText(html = stringResource(Res.string.quest_settings_dot_labels_message),
                     style = MaterialTheme.typography.body1
                 )
                 TextField(
@@ -121,8 +119,7 @@ fun getPrefixedLabelSourcePref(questType: OsmElementQuestType<*>, prefs: Prefere
         onDismissRequest = onDismissRequest,
         content = {
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(
-                    text = AnnotatedString.fromHtml(stringResource(messageId)),
+                HtmlText(html = stringResource(messageId),
                     style = MaterialTheme.typography.body1
                 )
                 TextField(
@@ -171,8 +168,7 @@ fun getPrefixedLabelSourcePref(questType: OsmElementQuestType<*>, prefs: Prefere
         onDismissRequest = onDismissRequest,
         content = {
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(
-                    text = AnnotatedString.fromHtml(stringResource(messageId)),
+                HtmlText(html = stringResource(messageId),
                     style = MaterialTheme.typography.body1
                 )
                 TextField(
@@ -221,8 +217,7 @@ fun FullElementSelectionDialog(prefs: Preferences, pref: String, messageId: Stri
         onDismissRequest = onDismissRequest,
         content = {
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(
-                    text = AnnotatedString.fromHtml(org.jetbrains.compose.resources.stringResource(messageId)),
+                HtmlText(html = org.jetbrains.compose.resources.stringResource(messageId),
                     style = MaterialTheme.typography.body1
                 )
                 TextField(
@@ -296,25 +291,15 @@ private fun DiffButton(defaultText: String, getCurrentText: () -> String) {
         Text(stringResource(Res.string.quest_settings_highlight_changes_button))
     }
     if (showDialog) {
-        val drg = DiffRowGenerator.create()
-            .showInlineDiffs(true)
-            .mergeOriginalRevised(true)
-            .inlineDiffByWord(true)
-            .ignoreWhiteSpaces(true)
-            .oldTag { f -> if (f) "<b><i><del>" else "</del></i></b>" }
-            .newTag { f -> if (f) "<b><u><ins>" else "</ins></u></b>" }
-            .build()
-        val thatSpace = " "
-        val newDefault = defaultText.replace("|", "$thatSpace|$thatSpace") // replace with (nearly) invisible space, so word differences are used
-        val newCurrent = getCurrentText().replace("|", "$thatSpace|$thatSpace")
-        val diffRows = drg.generateDiffRows(newDefault.split("\n"), newCurrent.split("\n"))
-        val diffText = diffRows.mapNotNull {
-            if (it.tag == Tag.EQUAL) return@mapNotNull null
-            it.oldLine
-        }.joinToString("<br>")
+        val currentText = getCurrentText()
+        val diffText by produceState("", defaultText, currentText) {
+            value = withContext(Dispatchers.Default) {
+                createQuestFilterDiff(defaultText, currentText)
+            }
+        }
         InfoDialog(
             onDismissRequest = { showDialog = false },
-            text = { Text(AnnotatedString.fromHtml(diffText), style = MaterialTheme.typography.body1) }
+            text = { HtmlText(diffText, style = MaterialTheme.typography.body1) }
         )
     }
 }
@@ -374,7 +359,7 @@ private fun checkText(text: String, checkPrefix: String, delayedToast: (String?)
         } catch(e: ParseException) {
             delayedToast(e.message)
             false
-        } catch(e: PatternSyntaxException) {
+        } catch(e: IllegalArgumentException) {
             delayedToast(e.message)
             false
         }

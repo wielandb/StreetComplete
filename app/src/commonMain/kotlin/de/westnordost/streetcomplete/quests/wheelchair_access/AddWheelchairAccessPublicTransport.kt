@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
+import de.westnordost.streetcomplete.data.osm.mapdata.MapDataWithGeometry
+import de.westnordost.streetcomplete.data.osm.mapdata.filter
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmFilterQuestType
 import de.westnordost.streetcomplete.data.osm.osmquests.QuestAction
 import de.westnordost.streetcomplete.data.user.achievements.EditTypeAchievement.WHEELCHAIR
@@ -11,11 +13,18 @@ import de.westnordost.streetcomplete.osm.Tags
 import de.westnordost.streetcomplete.osm.updateWithCheckDate
 import de.westnordost.streetcomplete.resources.*
 
-class AddWheelchairAccessPublicTransport : OsmFilterQuestType<WheelchairAccess>() {
+class AddWheelchairAccessPublicTransport : OsmFilterQuestType<WheelchairAccessAnswer>() {
 
     override val elementFilter = """
         nodes, ways, relations with
-          (amenity = bus_station or railway ~ station|subway_entrance)
+          (
+            amenity ~ bus_station|ferry_terminal
+            or railway = subway_entrance
+            or (
+              railway ~ station|halt
+              and public_transport
+            )
+          )
           and access !~ no|private
           and (
             !wheelchair
@@ -31,12 +40,12 @@ class AddWheelchairAccessPublicTransport : OsmFilterQuestType<WheelchairAccess>(
     override val hint = Res.string.quest_wheelchairAccess_limited_description_public_transport
 
     @Composable
-    override fun Form(on: (QuestAction<WheelchairAccess>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
+    override fun Form(on: (QuestAction<WheelchairAccessAnswer>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
         AddWheelchairAccessForm(on, countryInfo)
     }
 
-    override fun applyAnswerTo(answer: WheelchairAccess, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
-        tags.updateWithCheckDate("wheelchair", answer.osmValue)
+    override fun applyAnswerTo(answer: WheelchairAccessAnswer, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
+        tags.updateWithCheckDate("wheelchair", answer.access.osmValue)
         answer.updatedDescriptions?.forEach { (language, description) ->
             // language already contains the colon, or may be empty
             if (description.isBlank())
@@ -45,4 +54,11 @@ class AddWheelchairAccessPublicTransport : OsmFilterQuestType<WheelchairAccess>(
                 tags["wheelchair:description$language"] = description
         }
     }
+
+    override fun getHighlightedElements(element: Element, mapData: MapDataWithGeometry) =
+        mapData.filter("""
+            nodes, ways, relations with
+              amenity = bus_station
+              or railway ~ station|subway_entrance
+        """)
 }

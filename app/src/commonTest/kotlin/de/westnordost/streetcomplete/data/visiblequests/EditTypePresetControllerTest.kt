@@ -5,6 +5,7 @@ import de.westnordost.streetcomplete.data.presets.EditTypePreset
 import de.westnordost.streetcomplete.data.presets.EditTypePresetsController
 import de.westnordost.streetcomplete.data.presets.EditTypePresetsDao
 import de.westnordost.streetcomplete.data.presets.EditTypePresetsSource
+import de.westnordost.streetcomplete.testutils.mockPrefs3
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.matcher.any
@@ -25,7 +26,7 @@ class EditTypePresetControllerTest {
 
     @BeforeTest fun setUp() {
         editTypePresetsDao = mock()
-//        prefs = mockPrefs3()
+        prefs = mockPrefs3()
         ctrl = EditTypePresetsController(editTypePresetsDao, prefs)
 
         listener = mock()
@@ -34,7 +35,7 @@ class EditTypePresetControllerTest {
 
     @Test fun get() {
         every { editTypePresetsDao.getName(1) } returns "huhu"
-        every { prefs.selectedEditTypePreset } returns 1
+        prefs.selectedEditTypePreset = 1
         assertEquals("huhu", ctrl.selectedEditTypePresetName)
     }
 
@@ -57,16 +58,20 @@ class EditTypePresetControllerTest {
     }
 
     @Test fun `delete current preset switches to preset 0`() {
-        every { prefs.selectedEditTypePreset } returns 55
+        prefs.selectedEditTypePreset = 55
+        prefs.putString("55_qs_AddSidewalk_highways", "primary")
+        prefs.putString("56_qs_AddSidewalk_highways", "residential")
         ctrl.delete(55)
         verify { editTypePresetsDao.delete(55) }
         verify { listener.onDeleted(55) }
-        verify { prefs.selectedEditTypePreset = 0L }
+        assertEquals(0L, prefs.selectedEditTypePreset)
+        assertEquals(null, prefs.prefs.getStringOrNull("55_qs_AddSidewalk_highways"))
+        assertEquals("residential", prefs.prefs.getStringOrNull("56_qs_AddSidewalk_highways"))
     }
 
     @Test fun `change current preset`() {
         ctrl.selectedId = 11
-        verify { prefs.selectedEditTypePreset = 11 }
-        verify { prefs.onSelectedEditTypePresetChanged(any()) }
+        assertEquals(11L, prefs.selectedEditTypePreset)
+        verify { listener.onSelectionChanged() }
     }
 }

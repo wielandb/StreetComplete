@@ -1,6 +1,5 @@
 package de.westnordost.streetcomplete.quests.custom
 
-import android.net.Uri
 import de.westnordost.streetcomplete.data.osm.edits.MapDataWithEditsSource
 import de.westnordost.streetcomplete.data.osm.geometry.ElementPointGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.BoundingBox
@@ -26,6 +25,7 @@ import io.github.vinceglb.filekit.sink
 import io.github.vinceglb.filekit.writeString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.buffered
@@ -50,8 +50,8 @@ class CustomQuestList : KoinComponent {
 
     fun reload() = load(entriesById)
 
-    fun readFromUri(uri: Uri) {
-        runBlocking { PlatformFile(uri).copyTo(customQuestFile) }
+    suspend fun readFromFile(file: PlatformFile) {
+        file.copyTo(customQuestFile)
         reload()
     }
 

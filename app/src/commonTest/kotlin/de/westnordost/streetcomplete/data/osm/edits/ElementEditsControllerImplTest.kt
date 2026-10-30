@@ -32,6 +32,7 @@ class ElementEditsControllerImplTest {
 
     @BeforeTest fun setUp() {
         db = mock {
+            every { getAll() } returns emptyList()
             every { delete(any()) } returns true
             every { markSynced(any()) } returns true
         }
@@ -180,7 +181,7 @@ class ElementEditsControllerImplTest {
         verify { elementsDb.put(edit.id, elementKeys) }
         val c = edit.action.newElementsCount
         verify { idProvider.assign(edit.id, c.nodes, c.ways, c.relations) }
-        verify { listener.onAddedEdit(any()) }
+        verify { listener.onAddedEdit(any(), null) }
     }
 
     private fun verifyDelete(vararg edits: ElementEdit) {

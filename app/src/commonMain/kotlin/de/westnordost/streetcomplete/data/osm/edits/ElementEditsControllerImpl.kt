@@ -68,9 +68,9 @@ class ElementEditsControllerImpl(
         add(ElementEdit(0, type, geometry, source, nowAsEpochMilliseconds(), false, newAction, isNearUserLocation), key)
     }
 
-    override fun get(id: Long): ElementEdit? = synchronized(this) { editCache[id] }
+    override fun get(id: Long): ElementEdit? = lock.withLock { editCache[id] }
 
-    override fun getAll(): List<ElementEdit> = synchronized(this) { editCache.values.toList() }
+    override fun getAll(): List<ElementEdit> = lock.withLock { editCache.values.toList() }
 
     override fun getAllUnsynced(): List<ElementEdit> =
         getAll().filterNot { it.isSynced }
@@ -78,7 +78,7 @@ class ElementEditsControllerImpl(
     override fun getOldestUnsynced(): ElementEdit? =
         getAllUnsynced().minByOrNull { it.createdTimestamp }
 
-    override fun getIdProvider(id: Long): ElementIdProvider = synchronized(emptyIdProviderCache) {
+    override fun getIdProvider(id: Long): ElementIdProvider = lock.withLock {
         if (emptyIdProviderCache.contains(id)) return ElementIdProvider(emptyList())
         val p = elementIdProviderDB.get(id)
         if (p.isEmpty()) emptyIdProviderCache.add(id)
@@ -137,7 +137,7 @@ class ElementEditsControllerImpl(
                 editElementsDB.put(id, updatedEdit.action.elementKeys)
             }
             if (editIdsToUpdate.isNotEmpty())
-                synchronized(emptyIdProviderCache) { emptyIdProviderCache.removeAll(editIdsToUpdate) }
+                lock.withLock { emptyIdProviderCache.removeAll(editIdsToUpdate) }
             syncSuccess = editsDB.markSynced(edit.id)
 
             if (syncSuccess)
@@ -146,7 +146,7 @@ class ElementEditsControllerImpl(
 
         if (syncSuccess) onSyncedEdit(syncedEdit, editIdsToUpdate) // forward which ids were updated, because history controller needs to reload those edits
         elementIdProviderDB.updateIds(elementUpdates.idUpdates)
-        synchronized(emptyIdProviderCache) { emptyIdProviderCache.remove(edit.id) }
+        lock.withLock { emptyIdProviderCache.remove(edit.id) }
     }
 
     override fun markSyncFailed(edit: ElementEdit) {
@@ -210,7 +210,7 @@ class ElementEditsControllerImpl(
 
         /* must be deleted after the callback because the callback might want to get the id provider
            for that edit */
-        synchronized(emptyIdProviderCache) { ids.forEach { emptyIdProviderCache.remove(it) } }
+        lock.withLock { ids.forEach { emptyIdProviderCache.remove(it) } }
         elementIdProviderDB.deleteAll(ids)
     }
 

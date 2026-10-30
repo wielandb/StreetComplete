@@ -4,11 +4,13 @@ import androidx.compose.runtime.Composable
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
+import de.westnordost.streetcomplete.data.osm.mapdata.MapDataWithGeometry
 import de.westnordost.streetcomplete.data.osm.osmquests.Answer
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmFilterQuestType
 import de.westnordost.streetcomplete.data.osm.osmquests.QuestAction
 import de.westnordost.streetcomplete.data.user.achievements.EditTypeAchievement.CITIZEN
 import de.westnordost.streetcomplete.osm.Tags
+import de.westnordost.streetcomplete.osm.places.isPlaceOrDisusedPlace
 import de.westnordost.streetcomplete.quests.baby_changing_table.BabyChangingTableAnswer.*
 import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.ui.common.quest.AnswerItem
@@ -29,6 +31,7 @@ class AddBabyChangingTable : OsmFilterQuestType<BabyChangingTableAnswer>() {
             ) and toilets != no
           )
           and !diaper and !changing_table
+          and access !~ private|no
     """
     override val changesetComment = "Survey availability of baby changing tables"
     override val wikiLink = "Key:changing_table"
@@ -64,4 +67,7 @@ class AddBabyChangingTable : OsmFilterQuestType<BabyChangingTableAnswer>() {
             NO_TOILET -> tags["toilets"] = "no"
         }
     }
+
+    override fun getHighlightedElements(element: Element, mapData: MapDataWithGeometry) =
+        mapData.asSequence().filter { it.isPlaceOrDisusedPlace() }
 }

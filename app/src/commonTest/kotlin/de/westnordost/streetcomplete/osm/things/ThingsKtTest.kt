@@ -1,10 +1,16 @@
 package de.westnordost.streetcomplete.osm.things
 
 import de.westnordost.streetcomplete.testutils.node
+import de.westnordost.streetcomplete.testutils.mockPrefs3
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ThingsKtTest {
+
+    @BeforeTest fun setUp() {
+        mockPrefs3()
+    }
 
     @Test fun `disused bench matches`() {
         val node = node(tags = mapOf("disused:amenity" to "bench"))

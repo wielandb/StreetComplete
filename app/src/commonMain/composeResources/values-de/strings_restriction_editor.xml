@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="restriction_editor_add">Beschränkung hinzufügen</string>
+    <string name="restriction_editor_turn">Abbiegebeschränkung</string>
+    <string name="restriction_editor_weight">Gewichtsbeschränkung</string>
+    <string name="restriction_editor_swap_ways">Ein- und Ausfahrt tauschen</string>
+</resources>

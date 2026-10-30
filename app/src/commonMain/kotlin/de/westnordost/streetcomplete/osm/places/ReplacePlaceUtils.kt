@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.osm.places
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 import de.westnordost.osmfeatures.Feature
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
 import de.westnordost.streetcomplete.osm.Tags
@@ -222,4 +224,4 @@ val KEYS_THAT_SHOULD_BE_REMOVED_WHEN_PLACE_IS_REPLACED = listOf(
     "shelter", "ref:alvara",
 )
     .flatMap { listOf(it, "source:$it", "check_date:$it") }
-    .map { it.intern().toRegex() }
+    .map { it.internString().toRegex() }

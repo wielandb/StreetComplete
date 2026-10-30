@@ -16,6 +16,7 @@ import de.westnordost.streetcomplete.resources.quest_settings_per_preset_rescan
 import de.westnordost.streetcomplete.ui.common.ToastPopup
 import de.westnordost.streetcomplete.ui.common.dialogs.SimpleListPickerDialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource

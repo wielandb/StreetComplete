@@ -21,7 +21,6 @@ import de.westnordost.streetcomplete.data.externalsource.ExternalSourceQuestCont
 import de.westnordost.streetcomplete.data.externalsource.ExternalSourceQuestType
 import de.westnordost.streetcomplete.data.osm.edits.IsRevertAction
 import de.westnordost.streetcomplete.data.upload.OnUploadedChangeListener
-import de.westnordost.streetcomplete.data.upload.Uploader
 import de.westnordost.streetcomplete.data.user.UserLoginController
 import de.westnordost.streetcomplete.data.user.statistics.StatisticsController
 import de.westnordost.streetcomplete.util.logs.Log
@@ -56,7 +55,7 @@ class ElementEditsUploader(
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + CoroutineName("ElementEditsUploader"))
 
-    suspend fun upload(uploader: Uploader) = mutex.withLock { withContext(Dispatchers.IO) {
+    suspend fun upload(retryUpload: suspend () -> Unit) = mutex.withLock { withContext(Dispatchers.IO) {
         while (true) {
             currentCoroutineContext().ensureActive()
             val edit = elementEditsController.getOldestUnsynced() ?: break
@@ -67,13 +66,13 @@ class ElementEditsUploader(
                 scope.launch {
                     delay(1000)
                     try {
-                        uploader.upload()
+                        retryUpload()
                     } catch (e: Exception) {
                         Log.i(TAG, "exception when continuing interrupted upload: $e")
-                        throw CancellationException() // not caught by UploadWorker.doWork, but we don't want
+                        throw CancellationException("Upload continuation failed", e) // not caught by UploadWorker.doWork, but we don't want
                     }
                 }
-                throw CancellationException() // don't simply break, because otherwise upload will continue with notes
+                throw CancellationException("Upload deferred until download completes") // don't simply break, because otherwise upload will continue with notes
             }
             /* the sync of local change -> API and its response should not be cancellable because
              * otherwise an inconsistency in the data would occur. E.g. no "star" for an uploaded

@@ -1,18 +1,13 @@
 package de.westnordost.streetcomplete.quests.crossing_markings
 
-import com.russhwolf.settings.ObservableSettings
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.osm.edits.update_tags.StringMapEntryAdd
 import de.westnordost.streetcomplete.data.osm.edits.update_tags.StringMapEntryModify
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.quests.answerAppliedTo
 import de.westnordost.streetcomplete.testutils.TestMapDataWithGeometry
-import de.westnordost.streetcomplete.testutils.mockPrefs
+import de.westnordost.streetcomplete.testutils.mockPrefs2
 import de.westnordost.streetcomplete.testutils.node
-import dev.mokkery.answering.returns
-import dev.mokkery.every
-import dev.mokkery.matcher.any
-import dev.mokkery.mock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -71,11 +66,8 @@ class AddCrossingMarkingsTest {
 }
 
 private fun questType(extended: Boolean = false): AddCrossingMarkings {
-    val settings: ObservableSettings = mock()
-    every { settings.getBoolean(any(), true) } returns true
-    every { settings.getBoolean(any(), false) } returns false
-    every { settings.getBoolean("qs_AddCrossingMarkings_extended", false) } returns extended
-    Prefs.sharedPreferences = mockPrefs()
+    val settings = mockPrefs2()
+    settings.putBoolean("qs_AddCrossingMarkings_extended", extended)
     Prefs.preferences = Preferences(settings)
     return AddCrossingMarkings()
 }

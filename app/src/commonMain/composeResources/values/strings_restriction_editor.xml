@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="restriction_editor_add">Add restriction</string>
+    <string name="restriction_editor_turn">Turn restriction</string>
+    <string name="restriction_editor_weight">Weight restriction</string>
+    <string name="restriction_editor_swap_ways">Swap entry and exit roads</string>
+</resources>

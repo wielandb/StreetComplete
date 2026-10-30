@@ -1,13 +1,5 @@
 package de.westnordost.streetcomplete.screens.settings
 
-import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
-import android.Manifest.permission.ACCESS_FINE_LOCATION
-import android.Manifest.permission.POST_NOTIFICATIONS
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,11 +28,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import de.westnordost.streetcomplete.DayNightBehavior
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmQuestController
@@ -51,6 +40,9 @@ import de.westnordost.streetcomplete.data.visiblequests.QuestTypeOrderController
 import de.westnordost.streetcomplete.data.visiblequests.VisibleEditTypeController
 import de.westnordost.streetcomplete.resources.Res
 import de.westnordost.streetcomplete.resources.*
+import de.westnordost.streetcomplete.ui.util.permissions.rememberQuestMonitorPermissionRequest
+import de.westnordost.streetcomplete.ui.util.permissions.hasSeparateLocationProviders
+import de.westnordost.streetcomplete.ui.common.ToastPopup
 import de.westnordost.streetcomplete.ui.common.BackIcon
 import de.westnordost.streetcomplete.ui.common.TextField2
 import de.westnordost.streetcomplete.ui.common.dialogs.AlertDialog
@@ -58,6 +50,7 @@ import de.westnordost.streetcomplete.ui.common.dialogs.SimpleListPickerDialog
 import de.westnordost.streetcomplete.ui.common.settings.Preference
 import de.westnordost.streetcomplete.ui.common.settings.SwitchPreference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -66,7 +59,6 @@ import org.koin.compose.koinInject
 fun QuestSettingsScreen(
     onClickBack: () -> Unit,
 ) {
-    val ctx = LocalContext.current
     val prefs: Preferences = koinInject()
     val scope = rememberCoroutineScope()
     val visibleEditTypeController: VisibleEditTypeController = koinInject()
@@ -176,6 +168,14 @@ fun QuestSettingsScreen(
     }
     if (questMonitorDialog) {
         var enable by remember { mutableStateOf(prefs.getBoolean(Prefs.QUEST_MONITOR, false)) }
+        var showPermissionWarning by remember { mutableStateOf(false) }
+        val requestMonitorPermission = rememberQuestMonitorPermissionRequest { granted ->
+            enable = granted
+            showPermissionWarning = !granted
+        }
+        val onEnableChange: (Boolean) -> Unit = { checked ->
+            if (checked) requestMonitorPermission() else enable = false
+        }
         var download by remember { mutableStateOf(prefs.getBoolean(Prefs.QUEST_MONITOR_DOWNLOAD, false)) }
         var gps by remember { mutableStateOf(prefs.getBoolean(Prefs.QUEST_MONITOR_GPS, false)) }
         var net by remember { mutableStateOf(prefs.getBoolean(Prefs.QUEST_MONITOR_NET, false)) }
@@ -192,35 +192,17 @@ fun QuestSettingsScreen(
                     prefs.putBoolean(Prefs.QUEST_MONITOR_DOWNLOAD, download)
                     prefs.putFloat(Prefs.QUEST_MONITOR_RADIUS, radius.text.toFloatOrNull() ?: 50f)
                     questMonitorDialog = false
-                }, enabled = radius.text.toFloatOrNull() != null) { Text(stringResource(Res.string.ok)) }
+                }, enabled = radius.text.toFloatOrNull()?.let { it.isFinite() && it > 0f } == true) { Text(stringResource(Res.string.ok)) }
             },
             text = {
                 Column {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clickable { enable = !enable },
+                        modifier = Modifier.fillMaxWidth().clickable { onEnableChange(!enable) },
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(stringResource(Res.string.pref_quest_monitor_title))
-                        Switch(enable, {
-                            val activity = ctx.getActivity()!!
-                            if (!activity.hasPermission(ACCESS_FINE_LOCATION)) {
-                                enable = false
-                                ActivityCompat.requestPermissions(activity, arrayOf(ACCESS_FINE_LOCATION), 0)
-                                return@Switch
-                            }
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !activity.hasPermission(ACCESS_BACKGROUND_LOCATION))  {
-                                enable = false
-                                ActivityCompat.requestPermissions(activity, arrayOf(ACCESS_BACKGROUND_LOCATION), 0)
-                                return@Switch
-                            }
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !activity.hasPermission(POST_NOTIFICATIONS)) {
-                                enable = false
-                                ActivityCompat.requestPermissions(activity, arrayOf(POST_NOTIFICATIONS), 0)
-                                return@Switch
-                            }
-                            enable = it
-                        })
+                        Switch(enable, onEnableChange)
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -235,10 +217,10 @@ fun QuestSettingsScreen(
                         modifier = Modifier.fillMaxWidth().clickable { gps = !gps },
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(stringResource(Res.string.quest_monitor_gps))
+                        Text(stringResource(if (hasSeparateLocationProviders) Res.string.quest_monitor_gps else Res.string.quest_monitor_high_accuracy))
                         Switch(gps, { gps = it })
                     }
-                    Row(
+                    if (hasSeparateLocationProviders) Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().clickable { net = !net },
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -251,17 +233,12 @@ fun QuestSettingsScreen(
                 }
             }
         )
+        if (showPermissionWarning) {
+            ToastPopup(
+                onDismissRequest = { showPermissionWarning = false },
+                text = stringResource(Res.string.quest_monitor_permission_required),
+                isInDialog = true,
+            )
+        }
     }
-}
-
-private fun Context.hasPermission(permission: String): Boolean =
-    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
-
-private fun Context.getActivity(): ComponentActivity? {
-    val componentActivity = when (this) {
-        is ComponentActivity -> this
-        is ContextWrapper -> baseContext.getActivity()
-        else -> null
-    }
-    return componentActivity
 }

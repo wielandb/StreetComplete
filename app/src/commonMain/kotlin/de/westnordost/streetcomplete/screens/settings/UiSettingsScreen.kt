@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.preferences.Preferences
+import de.westnordost.streetcomplete.data.preferences.supportsVolumeButtonMapZoom
 import de.westnordost.streetcomplete.resources.Res
 import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.ui.common.BackIcon
@@ -134,9 +135,12 @@ fun UiSettingsScreen(
                 default = false,
             )
             SwitchPreference(
-                name = stringResource(Res.string.pref_volume_zoom_title),
-                description = stringResource(Res.string.pref_volume_zoom_summary),
-                pref = Prefs.VOLUME_ZOOM,
+                name = stringResource(
+                    if (supportsVolumeButtonMapZoom) Res.string.pref_volume_zoom_title
+                    else Res.string.pref_title_zoom_buttons
+                ),
+                description = if (supportsVolumeButtonMapZoom) stringResource(Res.string.pref_volume_zoom_summary) else null,
+                pref = if (supportsVolumeButtonMapZoom) Prefs.VOLUME_ZOOM else Preferences.SHOW_ZOOM_BUTTONS,
                 default = false,
             )
             SwitchPreference(

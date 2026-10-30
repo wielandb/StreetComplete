@@ -12,11 +12,12 @@ import de.westnordost.streetcomplete.data.quest.QuestTypeRegistry
 import de.westnordost.streetcomplete.util.Mockable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import java.util.concurrent.CopyOnWriteArrayList
+import de.westnordost.streetcomplete.util.Listeners
 
 @Mockable
 class ExternalSourceQuestController(
@@ -30,7 +31,7 @@ class ExternalSourceQuestController(
         fun onUpdated(addedQuests: Collection<ExternalSourceQuest> = emptyList(), deletedQuestKeys: Collection<ExternalSourceQuestKey> = emptyList())
         fun onInvalidate()
     }
-    private val questListeners: MutableList<QuestListener> = CopyOnWriteArrayList()
+    private val questListeners = Listeners<QuestListener>()
     fun addQuestListener(questListener: QuestListener) {
         questListeners.add(questListener)
     }

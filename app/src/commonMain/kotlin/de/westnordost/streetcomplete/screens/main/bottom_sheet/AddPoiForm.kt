@@ -1,6 +1,9 @@
 package de.westnordost.streetcomplete.screens.main.bottom_sheet
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -37,6 +40,7 @@ import de.westnordost.streetcomplete.ui.common.quest.Marker
 import de.westnordost.streetcomplete.ui.theme.Dimensions
 import de.westnordost.streetcomplete.util.math.enclosingBoundingBox
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.painterResource
@@ -99,7 +103,9 @@ fun AddPoiForm(
                 iconPainter = painterResource(Res.drawable.ic_add_poi),
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(Dimensions.getOpenQuestFormMapPadding(LocalWindowInfo.current))
+                    .padding(Dimensions.getOpenQuestFormMapPadding(
+                        LocalWindowInfo.current, WindowInsets.safeDrawing.asPaddingValues()
+                    ))
                     .animateFallDown(startDelay = 200.milliseconds)
             )
         val prefs: Preferences = koinInject()

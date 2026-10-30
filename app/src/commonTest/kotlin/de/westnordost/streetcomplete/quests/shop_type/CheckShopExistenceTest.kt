@@ -14,13 +14,13 @@ class CheckShopExistenceTest {
     )
 
     @Test
-    fun `not applicable to old shops with unrecognised values and without name`() {
+    fun `applicable to old shops with unrecognised values and without name`() {
         val mapData = TestMapDataWithGeometry(
             listOf(
                 node(timestamp = 0, tags = mapOf("shop" to "weird_value")),
             ),
         )
-        assertEquals(0, questType.getApplicableElements(mapData).toList().size)
+        assertEquals(1, questType.getApplicableElements(mapData).toList().size)
     }
 
     @Test

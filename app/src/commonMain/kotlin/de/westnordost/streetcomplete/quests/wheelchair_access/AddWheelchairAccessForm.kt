@@ -23,22 +23,22 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AddWheelchairAccessForm(
-    on: (QuestAction<WheelchairAccess>) -> Unit,
+    on: (QuestAction<WheelchairAccessAnswer>) -> Unit,
     countryInfo: CountryInfo
 ) {
     val element = LocalElement.current!!
-    var descriptions by rememberSaveable { mutableStateOf(
+    var descriptions by rememberSaveable(element.key) { mutableStateOf(
         (countryInfo.officialLanguages.map { ":$it" } + ":en" + "").toSet().associateWith {
             element.tags["wheelchair:description$it"] ?: ""
         }
     ) }
-    var showDescriptionDialog by rememberSaveable { mutableStateOf(false) }
+    var showDescriptionDialog by rememberSaveable(element.key) { mutableStateOf(false) }
     QuestForm(
         on = on,
         answers = listOf(
-            AnswerItem(stringResource(Res.string.quest_generic_hasFeature_no)) { on(Answer(NO.apply { updatedDescriptions = descriptions })) },
-            AnswerItem(stringResource(Res.string.quest_wheelchairAccess_limited)) { on(Answer(LIMITED.apply { updatedDescriptions = descriptions })) },
-            AnswerItem(stringResource(Res.string.quest_generic_hasFeature_yes)) { on(Answer(YES.apply { updatedDescriptions = descriptions })) },
+            AnswerItem(stringResource(Res.string.quest_generic_hasFeature_no)) { on(Answer(WheelchairAccessAnswer(NO, descriptions.toMap()))) },
+            AnswerItem(stringResource(Res.string.quest_wheelchairAccess_limited)) { on(Answer(WheelchairAccessAnswer(LIMITED, descriptions.toMap()))) },
+            AnswerItem(stringResource(Res.string.quest_generic_hasFeature_yes)) { on(Answer(WheelchairAccessAnswer(YES, descriptions.toMap()))) },
         ),
         otherAnswers = { listOf(
             AnswerItem(stringResource(Res.string.quest_wheelchair_description_answer)) { showDescriptionDialog = true }

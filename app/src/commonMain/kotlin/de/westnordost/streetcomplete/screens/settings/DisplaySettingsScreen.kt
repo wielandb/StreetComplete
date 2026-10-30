@@ -18,6 +18,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,9 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.download.DownloadController
-import de.westnordost.streetcomplete.data.download.Downloader
 import de.westnordost.streetcomplete.data.importGpx
-import de.westnordost.streetcomplete.data.osm.mapdata.LatLon
+import de.westnordost.streetcomplete.data.MapOverlayFiles
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.data.visiblequests.VisibleEditTypeController
 import de.westnordost.streetcomplete.resources.*
@@ -40,18 +40,15 @@ import de.westnordost.streetcomplete.ui.common.settings.Preference
 import de.westnordost.streetcomplete.ui.common.settings.SwitchPreference
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.copyTo
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.exists
-import io.github.vinceglb.filekit.filesDir
-import io.github.vinceglb.filekit.readString
-import io.ticofab.androidgpxparser.parser.GPXParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.milliseconds
@@ -63,6 +60,23 @@ fun DisplaySettingsScreen(
     val visibleEditTypeController: VisibleEditTypeController = koinInject()
     val prefs: Preferences = koinInject()
     val scope = rememberCoroutineScope()
+    val revision by MapOverlayFiles.revision.collectAsState()
+    val gpxExists = remember(revision) { MapOverlayFiles.gpxFile.exists() }
+    val geometryExists = remember(revision) { MapOverlayFiles.geometryFile.exists() }
+    var importError by remember { mutableStateOf(false) }
+
+    fun selectFile(type: FileKitType, importFile: suspend (PlatformFile) -> Unit) {
+        scope.launch {
+            try {
+                val file = FileKit.openFilePicker(type) ?: return@launch
+                withContext(Dispatchers.IO) { importFile(file) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                importError = true
+            }
+        }
+    }
     var showBackgroundDialog by remember { mutableStateOf(false) }
     var showGpxDialog by remember { mutableStateOf(false) }
     var showGeometryDialog by remember { mutableStateOf(false) }
@@ -143,13 +157,6 @@ fun DisplaySettingsScreen(
                     selectedItem = prefs.getString(Prefs.THEME_BACKGROUND, "MAP")
                 )
             if (showGpxDialog) {
-                suspend fun getFile() {
-                    val file = FileKit.openFilePicker(FileKitType.File(".gpx")) ?: return
-                    file.copyTo(gpxFile)
-                    gpx_track_changed = true
-                    showGpxDialog = false
-                    showGpxDialog = true
-                }
                 val downloadController: DownloadController = koinInject()
                 var error by remember { mutableStateOf(false) }
                 AlertDialog(
@@ -157,108 +164,70 @@ fun DisplaySettingsScreen(
                     confirmButton = {
                         TextButton(onClick = { showGpxDialog = false }) { Text(stringResource(Res.string.close)) }
                     },
-                    title = { Text(stringResource(Res.string.pref_gpx_track_title))},
+                    title = { Text(stringResource(Res.string.pref_gpx_track_title)) },
                     text = {
                         Column {
                             Button(
                                 onClick = {
-                                    val points = loadGpxTrackPoints({ error = true }, true) ?: return@Button
-                                    GlobalScope.launch {
-                                        val import = importGpx(points, true, 10.0).getOrNull()
-                                        import?.downloadBBoxes?.let {
-                                            if (it.isEmpty()) return@launch
-                                            Downloader.enqueuedDownloads.addAll(it.drop(1))
-                                            downloadController.download(it.first(), false, true)
+                                    scope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                val boxes = MapOverlayFiles.readGpxTracks().flatMap { points ->
+                                                    importGpx(points, true, 10.0).getOrThrow().downloadBBoxes
+                                                }.distinct()
+                                                boxes.forEach { downloadController.download(it, false, true) }
+                                            }
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (e: Exception) {
+                                            error = true
                                         }
                                     }
                                 },
-                                enabled = gpxFile.exists()
+                                enabled = gpxExists,
                             ) { Text(stringResource(Res.string.pref_gpx_track_download), Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
-                            Button(
-                                onClick = {
-                                    scope.launch(Dispatchers.IO) { getFile() }
-                                }
-                            ) { Text(stringResource(Res.string.pref_gpx_track_provide), Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
-                            if (gpxFile.exists())
-                                SwitchPreference(
-                                    name = stringResource(Res.string.pref_gpx_track_enable),
-                                    default = false,
-                                    pref = Prefs.SHOW_GPX_TRACK,
-                                )
+                            Button(onClick = { selectFile(FileKitType.File("gpx"), MapOverlayFiles::importGpx) }) {
+                                Text(stringResource(Res.string.pref_gpx_track_provide), Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                            }
+                            if (gpxExists) SwitchPreference(
+                                name = stringResource(Res.string.pref_gpx_track_enable),
+                                default = false,
+                                pref = Prefs.SHOW_GPX_TRACK,
+                            )
                         }
                     },
                 )
-                if (error)
-                    ToastPopup({ error = false }, stringResource(Res.string.pref_gpx_track_loading_error), isInDialog = true)
+                if (error) ToastPopup({ error = false }, stringResource(Res.string.pref_gpx_track_loading_error), isInDialog = true)
             }
             if (showGeometryDialog) {
-                suspend fun getFile() {
-                    val file = FileKit.openFilePicker(FileKitType.File(".gpx")) ?: return
-                    file.copyTo(customGeometryFile)
-                    custom_geometry_changed = true
-                    showGeometryDialog = false
-                    showGeometryDialog = true
-                }
                 AlertDialog(
                     onDismissRequest = { showGeometryDialog = false },
                     confirmButton = {
                         TextButton(onClick = { showGeometryDialog = false }) { Text(stringResource(Res.string.close)) }
                     },
-                    title = { Text(stringResource(Res.string.pref_custom_geometry_title))},
+                    title = { Text(stringResource(Res.string.pref_custom_geometry_title)) },
                     text = {
                         Column {
                             Text(stringResource(Res.string.pref_custom_geometry_info))
-                            Button(
-                                onClick = {
-                                    scope.launch(Dispatchers.IO) { getFile() }
-                                }
-                            ) { Text(stringResource(Res.string.file_provide), Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
-                            if (customGeometryFile.exists())
-                                SwitchPreference(
-                                    name = stringResource(Res.string.quest_enabled),
-                                    default = false,
-                                    pref = Prefs.SHOW_CUSTOM_GEOMETRY,
-                                )
+                            Button(onClick = {
+                                selectFile(FileKitType.File("geojson", "json"), MapOverlayFiles::importGeometry)
+                            }) {
+                                Text(stringResource(Res.string.file_provide), Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                            }
+                            if (geometryExists) SwitchPreference(
+                                name = stringResource(Res.string.quest_enabled),
+                                default = false,
+                                pref = Prefs.SHOW_CUSTOM_GEOMETRY,
+                            )
                         }
                     },
                 )
             }
+            if (importError) ToastPopup(
+                onDismissRequest = { importError = false },
+                text = stringResource(Res.string.import_error),
+                isInDialog = showGpxDialog || showGeometryDialog,
+            )
         }
     }
 }
-
-fun loadGpxTrackPoints(onError: () -> Unit, complain: Boolean = false): List<LatLon>? {
-    // load gpx file as one long track, no matter how it's stored internally (for now)
-    // <trkpt lat="..." lon="..."><ele>...</ele></trkpt>
-    // <wpt lon="..." lat="...">
-    if (!gpxFile.exists()) {
-        if (complain) onError()
-        return null
-    }
-
-    val gpxPoints = runCatching { runBlocking {
-        GPXParser().parse(gpxFile.readString().byteInputStream()).tracks.map { track ->
-            track.trackSegments.map { segment ->
-                segment.trackPoints
-            }
-        }.flatten().flatten()
-            .map { trackPoint ->
-                LatLon(
-                    latitude = trackPoint.latitude,
-                    longitude = trackPoint.longitude
-                )
-            }
-    } }.getOrNull()
-
-    if ((gpxPoints?.size ?: 0) < 2) {
-        onError()
-        return null
-    }
-    return gpxPoints
-}
-
-private val gpxFile = PlatformFile(FileKit.filesDir, "display_track.gpx")
-val customGeometryFile = PlatformFile(FileKit.filesDir, "customGeometry.geojson")
-
-var gpx_track_changed = false
-var custom_geometry_changed = false

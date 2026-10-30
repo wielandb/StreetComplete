@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
+import de.westnordost.streetcomplete.data.osm.mapdata.MapDataWithGeometry
+import de.westnordost.streetcomplete.data.osm.mapdata.filter
 import de.westnordost.streetcomplete.data.osm.osmquests.OsmFilterQuestType
 import de.westnordost.streetcomplete.data.osm.osmquests.QuestAction
 import de.westnordost.streetcomplete.data.user.achievements.EditTypeAchievement.WHEELCHAIR
@@ -11,7 +13,7 @@ import de.westnordost.streetcomplete.osm.Tags
 import de.westnordost.streetcomplete.osm.updateWithCheckDate
 import de.westnordost.streetcomplete.resources.*
 
-class AddWheelchairAccessToilets : OsmFilterQuestType<WheelchairAccess>() {
+class AddWheelchairAccessToilets : OsmFilterQuestType<WheelchairAccessAnswer>() {
 
     override val elementFilter = """
         nodes, ways, relations with
@@ -32,12 +34,12 @@ class AddWheelchairAccessToilets : OsmFilterQuestType<WheelchairAccess>() {
     override val hintImages = listOf(Res.drawable.wheelchair_sign)
 
     @Composable
-    override fun Form(on: (QuestAction<WheelchairAccess>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
+    override fun Form(on: (QuestAction<WheelchairAccessAnswer>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
         AddWheelchairAccessForm(on, countryInfo)
     }
 
-    override fun applyAnswerTo(answer: WheelchairAccess, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
-        tags.updateWithCheckDate("wheelchair", answer.osmValue)
+    override fun applyAnswerTo(answer: WheelchairAccessAnswer, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
+        tags.updateWithCheckDate("wheelchair", answer.access.osmValue)
         answer.updatedDescriptions?.forEach { (language, description) ->
             // language already contains the colon, or may be empty
             if (description.isBlank())
@@ -46,4 +48,7 @@ class AddWheelchairAccessToilets : OsmFilterQuestType<WheelchairAccess>() {
                 tags["wheelchair:description$language"] = description
         }
     }
+
+    override fun getHighlightedElements(element: Element, mapData: MapDataWithGeometry) =
+        mapData.filter("nodes, ways, relations with amenity = toilets")
 }

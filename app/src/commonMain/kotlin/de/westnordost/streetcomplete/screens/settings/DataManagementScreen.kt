@@ -44,6 +44,8 @@ import de.westnordost.streetcomplete.data.osm.osmquests.OsmQuestsHiddenTable
 import de.westnordost.streetcomplete.data.osmnotes.notequests.NoteQuestsHiddenTable
 import de.westnordost.streetcomplete.data.overlays.Overlay
 import de.westnordost.streetcomplete.data.preferences.Preferences
+import de.westnordost.streetcomplete.data.preferences.adaptImportedMapControls
+import de.westnordost.streetcomplete.data.preferences.importLegacyLongSettings
 import de.westnordost.streetcomplete.data.presets.EditTypePreset
 import de.westnordost.streetcomplete.data.presets.EditTypePresetsController
 import de.westnordost.streetcomplete.data.presets.EditTypePresetsTable
@@ -77,6 +79,7 @@ import io.github.vinceglb.filekit.sink
 import io.github.vinceglb.filekit.source
 import io.ktor.utils.io.core.writeText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -392,7 +395,8 @@ private const val BACKUP_PRESETS_QUEST_SETTINGS = "quest_settings"
 
 private const val TAG = "DataManagementSettings"
 
-const val LAST_KNOWN_DB_VERSION = 21L
+// Schema 22 retires charging-capacity quests; the exported table formats are unchanged.
+const val LAST_KNOWN_DB_VERSION = 22L
 
 val renamedQuests = mapOf(
     "ExternalQuest" to CustomQuest::class.simpleName!!,
@@ -472,6 +476,7 @@ private fun settingsToString(settings: Map<String, Any?>): String {
     val ints = settings.filterValues { it is Int } as Map<String, Int>
     val longs = settings.filterValues { it is Long } as Map<String, Long>
     val floats = settings.filterValues { it is Float } as Map<String, Float>
+    val doubles = settings.filterValues { it is Double } as Map<String, Double>
     val strings = settings.filterValues { it is String } as Map<String, String>
     // now write
     val sb = StringBuilder()
@@ -486,6 +491,9 @@ private fun settingsToString(settings: Map<String, Any?>): String {
     sb.appendLine()
     sb.appendLine("float settings")
     sb.appendLine( Json.encodeToString(floats))
+    sb.appendLine()
+    sb.appendLine("double settings")
+    sb.appendLine(Json.encodeToString(doubles))
     sb.appendLine()
     sb.appendLine("string settings")
     sb.appendLine( Json.encodeToString(strings))
@@ -577,18 +585,25 @@ private fun importCustomOverlays(file: PlatformFile, replaceExisting: Boolean, p
 
 private fun readToSettings(list: List<String>, prefs: Preferences): Boolean {
     val i = list.iterator()
+    var importedVolumeButtonZoom: Boolean? = null
     try {
         while (i.hasNext()) {
             val next = i.next()
             if (next.isBlank()) continue
             when (next) {
-                "boolean settings" -> Json.decodeFromString<Map<String, Boolean>>(i.next()).forEach { prefs.putBoolean(it.key, it.value) }
+                "boolean settings" -> {
+                    val values = Json.decodeFromString<Map<String, Boolean>>(i.next())
+                    values[Prefs.VOLUME_ZOOM]?.let { importedVolumeButtonZoom = it }
+                    values.forEach { prefs.putBoolean(it.key, it.value) }
+                }
                 "int settings" -> Json.decodeFromString<Map<String, Int>>(i.next()).forEach { prefs.putInt(it.key, it.value) }
-                "long settings" -> Json.decodeFromString<Map<String, Long>>(i.next()).forEach { prefs.putLong(it.key, it.value) }
+                "long settings" -> importLegacyLongSettings(Json.decodeFromString<Map<String, Long>>(i.next()), prefs.prefs)
                 "float settings" -> Json.decodeFromString<Map<String, Float>>(i.next()).forEach { prefs.putFloat(it.key, it.value) }
+                "double settings" -> Json.decodeFromString<Map<String, Double>>(i.next()).forEach { prefs.putDouble(it.key, it.value) }
                 "string settings" -> Json.decodeFromString<Map<String, String>>(i.next()).forEach { prefs.putString(it.key, it.value) }
             }
         }
+        adaptImportedMapControls(prefs.prefs, importedVolumeButtonZoom)
         return true
     } catch (e: Exception) {
         return false

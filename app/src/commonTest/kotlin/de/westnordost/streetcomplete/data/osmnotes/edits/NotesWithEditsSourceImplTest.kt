@@ -204,11 +204,15 @@ class NotesWithEditsSourceImplTest {
 
     @Test
     fun getAllPositions() {
-        val ps1 = listOf(p(3.0, 2.0), p(1.0, 3.0))
-        val ps2 = listOf(p(3.0, 2.0), p(5.0, 1.0))
+        val ps1 = listOf(p(0.3, 0.2), p(0.1, 0.3))
+        val ps2 = listOf(p(0.3, 0.2), p(0.5, 0.1))
 
-        every { noteController.getAllPositions(any()) } returns ps1
-        every { noteEditsSource.getAllUnsyncedPositions(any()) } returns ps2
+        every { noteController.getAll(any<BoundingBox>()) } returns ps1.mapIndexed { i, p ->
+            note(id = i + 1L, position = p)
+        }
+        every { noteEditsSource.getAllUnsynced(any()) } returns ps2.mapIndexed { i, p ->
+            noteEdit(noteId = -i - 1L, pos = p, action = NoteEditAction.CREATE)
+        }
 
         val positions = src.getAllPositions(bbox)
 
@@ -239,28 +243,28 @@ class NotesWithEditsSourceImplTest {
     @Test
     fun `getAll returns updated notes`() {
         every { noteController.getAll(any<BoundingBox>()) } returns listOf(
-            note(id = 1, position = p(1.0, 2.0), timestamp = 10, comments = listOf(
+            note(id = 1, position = p(0.1, 0.2), timestamp = 10, comments = listOf(
                 comment("test", NoteComment.Action.OPENED, timestamp = 100)
             )),
-            note(id = 3, position = p(0.0, 3.0), timestamp = 800)
+            note(id = 3, position = p(0.0, 0.3), timestamp = 800)
         )
         every { noteEditsSource.getAllUnsynced(any()) } returns listOf(
-            noteEdit(noteId = 2, action = NoteEditAction.CREATE, text = "xyz", timestamp = 300, pos = p(12.0, 1.0)),
+            noteEdit(noteId = 2, action = NoteEditAction.CREATE, text = "xyz", timestamp = 300, pos = p(0.12, 0.1)),
             noteEdit(noteId = 1, action = NoteEditAction.COMMENT, text = "test2", timestamp = 500),
             noteEdit(noteId = 2, action = NoteEditAction.COMMENT, text = "abc", timestamp = 900),
         )
 
         assertTrue(
             listOf(
-                note(id = 1, position = p(1.0, 2.0), timestamp = 10, comments = listOf(
+                note(id = 1, position = p(0.1, 0.2), timestamp = 10, comments = listOf(
                     comment("test", NoteComment.Action.OPENED, timestamp = 100),
                     comment("test2", NoteComment.Action.COMMENTED, timestamp = 500, user = user)
                 )),
-                note(id = 2, position = p(12.0, 1.0), timestamp = 300, comments = listOf(
+                note(id = 2, position = p(0.12, 0.1), timestamp = 300, comments = listOf(
                     comment("xyz", NoteComment.Action.OPENED, timestamp = 300, user = user),
                     comment("abc", NoteComment.Action.COMMENTED, timestamp = 900, user = user),
                 )),
-                note(id = 3, position = p(0.0, 3.0), timestamp = 800)
+                note(id = 3, position = p(0.0, 0.3), timestamp = 800)
             ).containsExactlyInAnyOrder(src.getAll(bbox))
         )
     }

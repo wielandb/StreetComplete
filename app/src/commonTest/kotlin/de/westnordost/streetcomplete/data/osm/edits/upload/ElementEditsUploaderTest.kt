@@ -63,7 +63,9 @@ class ElementEditsUploaderTest {
     @Test fun `cancel upload finishes current edit`() = runBlocking {
         val edit = edit()
         val updates = MapDataUpdates()
-        val job = launch(start = CoroutineStart.LAZY) { /*uploader.upload()*/ }
+        val job = launch(start = CoroutineStart.LAZY) {
+            uploader.upload { error("Upload was unexpectedly deferred") }
+        }
         every { elementEditsController.getOldestUnsynced() } sequentially {
             returns(edit)
             repeat { returns(null) }
@@ -93,7 +95,7 @@ class ElementEditsUploaderTest {
         }
         everySuspend { singleUploader.upload(any(), any()) } returns updates
 
-//        uploader.upload(mock())
+        uploader.upload { error("Upload was unexpectedly deferred") }
 
         verifySuspend { singleUploader.upload(edit, any()) }
         verify { listener.onUploaded(any(), any()) }
@@ -125,7 +127,7 @@ class ElementEditsUploaderTest {
         }
         everySuspend { singleUploader.upload(any(), any()) } throws ConflictException()
 
-//        uploader.upload(mock())
+        uploader.upload { error("Upload was unexpectedly deferred") }
 
         verifySuspend { singleUploader.upload(edit, any()) }
         verify { listener.onDiscarded(any(), any()) }

@@ -14,7 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.toColorInt
+import de.westnordost.streetcomplete.ui.util.toArgbInt
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.elementfilter.ElementFilterExpression
 import de.westnordost.streetcomplete.data.elementfilter.toElementFilterExpression
@@ -164,7 +164,7 @@ private fun getStyle(element: Element, colorKeySelector: Regex?, dashFilter: Ele
                 else null
             }.sorted().joinToString() // sort because tags hashMap doesn't have a defined order
             if (colorString.isEmpty()) defaultMissingColor
-            else Color(createColorFromString(colorString).toColorInt())
+            else Color(createColorFromString(colorString).toArgbInt())
         }
     }
 
@@ -198,11 +198,11 @@ private fun getStyle(element: Element, colorKeySelector: Regex?, dashFilter: Ele
         }
         // make sure to use all matching color tags
         if (leftColorTags.isNotEmpty())
-            leftColor = Color(createColorFromString(leftColorTags.sorted().joinToString()).toColorInt())
+            leftColor = Color(createColorFromString(leftColorTags.sorted().joinToString()).toArgbInt())
         if (rightColorTags.isNotEmpty())
-            rightColor = Color(createColorFromString(rightColorTags.sorted().joinToString()).toColorInt())
+            rightColor = Color(createColorFromString(rightColorTags.sorted().joinToString()).toArgbInt())
         if (centerColorTags.isNotEmpty())
-            centerColor = Color(createColorFromString(centerColorTags.sorted().joinToString()).toColorInt())
+            centerColor = Color(createColorFromString(centerColorTags.sorted().joinToString()).toArgbInt())
     }
 
 

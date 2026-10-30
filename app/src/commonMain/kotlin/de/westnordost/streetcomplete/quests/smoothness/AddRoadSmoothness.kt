@@ -45,7 +45,7 @@ class AddRoadSmoothness : OsmFilterQuestType<SmoothnessAnswer>() {
     }
 
     override fun getHighlightedElements(element: Element, mapData: MapDataWithGeometry): Sequence<Element> {
-        val nodes = (element as Way).nodeIds
+        val nodes = (element as? Way)?.nodeIds ?: return emptySequence()
         return mapData.nodes.asSequence().filter { it.id in nodes && barrierFilter.matches(it) }
     }
 

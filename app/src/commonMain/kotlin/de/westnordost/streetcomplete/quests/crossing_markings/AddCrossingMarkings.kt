@@ -1,8 +1,6 @@
 package de.westnordost.streetcomplete.quests.crossing_markings
 
-import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 import de.westnordost.streetcomplete.data.elementfilter.toElementFilterExpression
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
@@ -21,10 +19,8 @@ import de.westnordost.streetcomplete.util.ktx.toYesNo
 import de.westnordost.streetcomplete.ui.common.item_select.ImageWithLabel
 import de.westnordost.streetcomplete.ui.common.quest.AnswerItem
 import de.westnordost.streetcomplete.ui.common.quest.QuestForm
-import de.westnordost.streetcomplete.util.image.toPainter
-import de.westnordost.streetcomplete.util.ktx.name
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.painterResource
 import kotlin.collections.set
 
 class AddCrossingMarkings : OsmElementQuestType<Set<CrossingMarkings>> {
@@ -73,12 +69,10 @@ class AddCrossingMarkings : OsmElementQuestType<Set<CrossingMarkings>> {
     @Composable
     override fun Form(on: (QuestAction<Set<CrossingMarkings>>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
         if (prefs.getBoolean(PREF_CROSSING_MARKING_EXTENDED, false)) {
-            val ctx = LocalContext.current
-            val size = ctx.resources.displayMetrics.widthPixels / 4
             CrossingMarkingsForm(
                 on = on,
                 items = CrossingMarkings.entries.filter { it != CrossingMarkings.YES },
-                itemContent = { ImageWithLabel(ctx.getDrawable(it.imageRes!!.toResId(ctx))!!.toPainter(size), stringResource(it.titleRes!!)) },
+                itemContent = { ImageWithLabel(painterResource(it.imageRes!!), stringResource(it.titleRes!!)) },
             )
         } else {
             QuestForm(
@@ -125,15 +119,3 @@ class AddCrossingMarkings : OsmElementQuestType<Set<CrossingMarkings>> {
 }
 
 private const val PREF_CROSSING_MARKING_EXTENDED = "qs_AddCrossingMarkings_extended"
-
-private fun drawableResId(name: String, context: Context): Int {
-    nameToId[name]?.let { return it }
-    val id = context.resources.getIdentifier(name, "drawable", context.packageName)
-    require(id != 0) { "drawable $name not found"}
-    nameToId[name] = id
-    return id
-}
-
-private fun DrawableResource.toResId(context: Context): Int = drawableResId(name, context)
-
-private val nameToId = hashMapOf<String, Int>()

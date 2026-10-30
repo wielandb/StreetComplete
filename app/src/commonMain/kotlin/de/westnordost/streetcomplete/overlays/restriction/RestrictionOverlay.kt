@@ -2,8 +2,7 @@ package de.westnordost.streetcomplete.overlays.restriction
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
+import de.westnordost.streetcomplete.ui.util.interpolateColors
 import de.westnordost.streetcomplete.data.meta.CountryInfo
 import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
@@ -49,7 +48,11 @@ class RestrictionOverlay : Overlay {
 
     @Composable
     override fun Form(on: (OverlayAction) -> Unit, element: Element?, geometry: ElementGeometry, countryInfo: CountryInfo) {
-        TODO("Not yet implemented")
+        if (element is Way) {
+            RestrictionOverlayWayForm(on, element, geometry, countryInfo)
+        } else {
+            RestrictionOverlayNodeForm(on, element as? Node, geometry, countryInfo)
+        }
     }
 //    override fun createForm(element: Element?): AbstractOverlayForm = RestrictionOverlayNodeForm()
 //        if (element is Way) RestrictionOverlayWayForm()
@@ -84,7 +87,7 @@ class RestrictionOverlay : Overlay {
             if (colors.first() == colors.last())
                 colors.first()
             else
-                Color(ColorUtils.blendARGB(colors.first().toArgb(), colors.last().toArgb(), 0.5f))
+                interpolateColors(colors.first(), colors.last(), 0.5f)
         } else
             relations.first().getColor(way.id)
         return OverlayStyle.Polyline(OverlayStyle.Stroke(color))
@@ -128,7 +131,7 @@ fun Relation.isSupportedTurnRestriction(): Boolean {
     if (members.count { it.type == ElementType.WAY && it.role == "to" } != 1) return false
     val viaWayCount = members.count { it.type == ElementType.WAY && it.role == "via" }
     val viaNodeCount = members.count { it.type == ElementType.NODE && it.role == "via" }
-    if (viaNodeCount > 1) return false
+    if (viaNodeCount > 1 || viaWayCount == 0 && viaNodeCount == 0) return false
     if (viaNodeCount != 0 && viaWayCount != 0) return false
     return true
 }
@@ -148,5 +151,5 @@ val turnRestrictionTypes = linkedSetOf(
 
 private val maxWeightKeys = MaxWeightType.entries.map { it.osmKey }.toTypedArray()
 
-private val darkerGold = Color(ColorUtils.blendARGB(OverlayColor.Gold.toArgb(), OverlayColor.Black.toArgb(), 0.75f))
-private val darkerOrange = Color(ColorUtils.blendARGB(OverlayColor.Orange.toArgb(), OverlayColor.Black.toArgb(), 0.75f))
+private val darkerGold = interpolateColors(OverlayColor.Gold, OverlayColor.Black, 0.75f)
+private val darkerOrange = interpolateColors(OverlayColor.Orange, OverlayColor.Black, 0.75f)

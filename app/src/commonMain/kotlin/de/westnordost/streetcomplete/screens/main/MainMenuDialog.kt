@@ -27,8 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,9 +46,7 @@ import de.westnordost.streetcomplete.resources.user_login
 import de.westnordost.streetcomplete.resources.user_profile
 import de.westnordost.streetcomplete.resources.quick_switch_preset
 import de.westnordost.streetcomplete.Prefs
-import de.westnordost.streetcomplete.R
 import de.westnordost.streetcomplete.data.preferences.Preferences
-import de.westnordost.streetcomplete.data.presets.EditTypePresetsController
 import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.screens.main.controls.NotificationBox
 import de.westnordost.streetcomplete.screens.main.teammode.TeamModeColorCircle
@@ -66,6 +62,7 @@ import org.jetbrains.compose.resources.stringResource
 fun MainMenuDialog(
     onDismissRequest: () -> Unit,
     onClickProfile: () -> Unit,
+    onClickLogin: () -> Unit,
     onClickSettings: () -> Unit,
     onClickAbout: () -> Unit,
     onClickDownload: () -> Unit,
@@ -97,7 +94,7 @@ fun MainMenuDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         BigMenuButton(
-                            onClick = { onDismissRequest(); onClickProfile() },
+                            onClick = { onDismissRequest(); if (isLoggedIn) onClickProfile() else onClickLogin() },
                             icon = { Icon(painterResource(Res.drawable.ic_profile_48), null) },
                             text = stringResource(
                                 if (isLoggedIn) Res.string.user_profile else Res.string.user_login
@@ -157,7 +154,7 @@ fun MainMenuDialog(
                         CompactMenuButton(
                             onClick = { showProfileSelectionDialog = true },
                             icon = { },
-                            text = stringResource(R.string.quick_switch_preset)
+                            text = stringResource(Res.string.quick_switch_preset)
                         )
                 } else {
                     FlowRow(
@@ -165,7 +162,7 @@ fun MainMenuDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         BigMenuButton(
-                            onClick = { onDismissRequest(); onClickProfile() },
+                            onClick = { onDismissRequest(); if (isLoggedIn) onClickProfile() else onClickLogin() },
                             icon = { Icon(painterResource(Res.drawable.ic_profile_48), null) },
                             text = stringResource(
                                 if (isLoggedIn) Res.string.user_profile else Res.string.user_login
@@ -297,6 +294,7 @@ private fun PreviewMainMenuDialog() {
     MainMenuDialog(
         onDismissRequest = {},
         onClickProfile = {},
+        onClickLogin = {},
         onClickSettings = {},
         onClickAbout = {},
         onClickDownload = {},

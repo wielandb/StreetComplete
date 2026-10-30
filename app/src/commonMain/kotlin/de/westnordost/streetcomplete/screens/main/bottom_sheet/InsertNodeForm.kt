@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -25,11 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.AbsoluteAlignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -40,7 +35,6 @@ import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.meta.CountryInfos
 import de.westnordost.streetcomplete.data.meta.get
 import de.westnordost.streetcomplete.data.osm.edits.MapDataWithEditsSource
-import de.westnordost.streetcomplete.data.osm.geometry.ElementGeometry
 import de.westnordost.streetcomplete.data.osm.geometry.ElementPointGeometry
 import de.westnordost.streetcomplete.data.osm.mapdata.LatLon
 import de.westnordost.streetcomplete.data.osm.mapdata.MapData
@@ -55,14 +49,15 @@ import de.westnordost.streetcomplete.resources.insert_node_select_way
 import de.westnordost.streetcomplete.screens.main.map.getIcon
 import de.westnordost.streetcomplete.screens.main.map.getTitle
 import de.westnordost.streetcomplete.ui.common.FloatingOkButton
+import de.westnordost.streetcomplete.ui.common.NonPredictiveBackHandler
 import de.westnordost.streetcomplete.ui.common.SwitchMapBackgroundButton
 import de.westnordost.streetcomplete.ui.common.bottom_sheet.BottomSheetFormScaffold
 import de.westnordost.streetcomplete.ui.common.feature.FeatureSearchDialog
-import de.westnordost.streetcomplete.ui.common.quest.LocalGetOffsetCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMarkersCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMetersPerDp
 import de.westnordost.streetcomplete.ui.common.quest.Marker
-import de.westnordost.streetcomplete.ui.ktx.pxToDp
+import de.westnordost.streetcomplete.ui.common.quest.OnMap
+import de.westnordost.streetcomplete.util.ktx.toPosition
 import de.westnordost.streetcomplete.ui.ktx.toPx
 import de.westnordost.streetcomplete.util.countryboundaries.CountryBoundaries
 import de.westnordost.streetcomplete.util.getNameAndLocationLabel
@@ -80,12 +75,10 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun InsertNodeForm(
     position: LatLon,
     onDismiss: () -> Unit,
-    highlightGeometries: ((Collection<ElementGeometry>) -> Unit)?,
     onSelectFeature: (Feature, PositionOnWay) -> Unit
 ) {
     val prefs: Preferences = koinInject()
@@ -114,11 +107,13 @@ fun InsertNodeForm(
             way to positions
         }
     }
-    BackHandler {
+    fun dismiss() {
         if (prefs.getString(Prefs.THEME_BACKGROUND, "MAP") != initialBackground)
             prefs.putString(Prefs.THEME_BACKGROUND, initialBackground)
         onDismiss()
     }
+    NonPredictiveBackHandler { dismiss() }
+
     val positionOnWay = remember(position, ways) {
         position.getPositionOnWaysForInsertNodeForm(
             ways = ways,
@@ -140,25 +135,24 @@ fun InsertNodeForm(
                     getTitle(node.tags)
                 )
             }
+        } + connectedWays.mapNotNull { way ->
+            mapData.getWayGeometry(way.id)?.let { Marker(it) }
         })
-        highlightGeometries?.invoke(connectedWays.mapNotNull { mapData.getWayGeometry(it.id) })
     }
     var showFeatureSearch by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize()) {
-        val offset = LocalGetOffsetCallback.current?.invoke(positionOnWay?.position ?: position) ?: Offset(0f, 0f)
+    OnMap {
         Icon(
             painter = painterResource(Res.drawable.crosshair),
             contentDescription = null,
             modifier = Modifier
-                .align(AbsoluteAlignment.TopLeft)
-                .size(72.dp)
-                .absoluteOffset(
-                    x = offset.x.pxToDp() - 36.dp,
-                    y = offset.y.pxToDp() - 36.dp
-                ),
+                .placedAt((positionOnWay?.position ?: position).toPosition())
+                .size(72.dp),
             tint = MaterialTheme.colors.onSurface
         )
+    }
+    Box(Modifier.fillMaxSize()) {
         BottomSheetFormScaffold(
+            onDismissRequest = ::dismiss,
             content = {
                 val featureDictionary: FeatureDictionary = koinInject()
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(6.dp)) {
@@ -174,11 +168,7 @@ fun InsertNodeForm(
                     )
                     Divider()
                     Row {
-                        TextButton({
-                            if (prefs.getString(Prefs.THEME_BACKGROUND, "MAP") != initialBackground)
-                                prefs.putString(Prefs.THEME_BACKGROUND, initialBackground)
-                            onDismiss()
-                        }) { Text(stringResource(Res.string.cancel)) }
+                        TextButton(::dismiss) { Text(stringResource(Res.string.cancel)) }
                         SwitchMapBackgroundButton()
                     }
                 }
@@ -212,7 +202,8 @@ fun InsertNodeForm(
                 geometryType = GeometryType.VERTEX,
                 countryCode = countryInfo.countryOrSubdivisionCode,
                 filterFn = { true },
-                codesOfDefaultFeatures = defaultFeatureIds.reversed()
+                codesOfDefaultFeatures = defaultFeatureIds.reversed(),
+                showKeyboardOnFocus = prefs.getBoolean(Prefs.CREATE_NODE_SHOW_KEYBOARD, true),
             )
         }
     }

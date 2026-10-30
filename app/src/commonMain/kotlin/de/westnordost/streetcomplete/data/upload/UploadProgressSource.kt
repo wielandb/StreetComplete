@@ -8,6 +8,7 @@ interface UploadProgressSource {
         fun onUploaded(editType: String, at: LatLon) {}
         fun onDiscarded(editType: String, at: LatLon) {}
         fun onError(e: Exception) {}
+        fun onBanCheckFailed() {}
         fun onFinished() {}
     }
 

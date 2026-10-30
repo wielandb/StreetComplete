@@ -1,8 +1,7 @@
 package de.westnordost.streetcomplete.data.osm.mapdata
 
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
+import de.westnordost.streetcomplete.util.platform.internString
+
 import de.westnordost.streetcomplete.data.Database
 import de.westnordost.streetcomplete.data.osm.mapdata.RelationTables.Columns.ID
 import de.westnordost.streetcomplete.data.osm.mapdata.RelationTables.Columns.INDEX
@@ -18,6 +17,7 @@ import de.westnordost.streetcomplete.data.osm.mapdata.RelationTables.NAME_MEMBER
 import de.westnordost.streetcomplete.util.Mockable
 import de.westnordost.streetcomplete.util.ktx.nowAsEpochMilliseconds
 import de.westnordost.streetcomplete.util.ktx.toInternedMap
+import kotlinx.serialization.json.Json
 
 /** Stores OSM relations */
 @Mockable
@@ -61,7 +61,7 @@ class RelationDao(private val db: Database) {
                     arrayOf(
                         relation.id,
                         relation.version,
-                        if (relation.tags.isNotEmpty()) jsonAdapter.toJson(relation.tags) else null,
+                        if (relation.tags.isNotEmpty()) Json.encodeToString(relation.tags) else null,
                         relation.timestampEdited,
                         time
                     )
@@ -82,7 +82,7 @@ class RelationDao(private val db: Database) {
                     RelationMember(
                         ElementType.valueOf(cursor.getString(TYPE)),
                         cursor.getLong(REF),
-                        cursor.getString(ROLE).intern()
+                        cursor.getString(ROLE).internString()
                     )
                 )
             }
@@ -91,7 +91,7 @@ class RelationDao(private val db: Database) {
                 Relation(
                     cursor.getLong(ID),
                     membersByRelationId.getValue(cursor.getLong(ID)),
-                    cursor.getStringOrNull(TAGS)?.let { jsonAdapter.fromJson(it)?.toInternedMap() } ?: emptyMap(),
+                    cursor.getStringOrNull(TAGS)?.let { Json.decodeFromString<Map<String, String>>(it).toInternedMap() } ?: emptyMap(),
                     cursor.getInt(VERSION),
                     cursor.getLong(TIMESTAMP)
                 )
@@ -179,6 +179,3 @@ class RelationDao(private val db: Database) {
             getAll(ids)
         }
 }
-
-private val jsonAdapter: JsonAdapter<Map<String, String>> = Moshi.Builder().build()
-    .adapter(Types.newParameterizedType(Map::class.java, String::class.java, String::class.java))

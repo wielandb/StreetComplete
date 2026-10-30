@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.data.elementfilter
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 import de.westnordost.streetcomplete.data.elementfilter.filters.CombineFilters
 import de.westnordost.streetcomplete.data.elementfilter.filters.DateFilter
 import de.westnordost.streetcomplete.data.elementfilter.filters.ElementFilter
@@ -231,7 +233,7 @@ private fun StringWithCursor.parseElementFilter(): ElementFilter {
         return ElementNewerThan(parseDateFilter())
     }
 
-    val key = parseTag().intern()
+    val key = parseTag().internString()
     val operator = parseOperatorWithSurroundingSpaces() ?: return HasKey(key)
 
     if (operator == OLDER) {
@@ -244,8 +246,8 @@ private fun StringWithCursor.parseElementFilter(): ElementFilter {
     if (operator in KEY_VALUE_OPERATORS) {
         val value = parseTag()
         when (operator) {
-            EQUALS       -> return HasTag(key, value.intern())
-            NOT_EQUALS   -> return NotHasTag(key, value.intern())
+            EQUALS       -> return HasTag(key, value.internString())
+            NOT_EQUALS   -> return NotHasTag(key, value.internString())
             LIKE         -> return HasTagValueLike(key, value)
             NOT_LIKE     -> return NotHasTagValueLike(key, value)
         }

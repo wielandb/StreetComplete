@@ -71,7 +71,7 @@ fun AccessManagerDialog(
         normalizeAccessTags(originalAccessTagsSets) !=
             normalizeAccessTags(newAccessTags.mapValues { it.value.toSet() })
 
-    val sortedEntries = newAccessTags.toSortedMap().entries.map { it.key to it.value.sorted() }
+    val sortedEntries = newAccessTags.entries.sortedBy { it.key }.map { it.key to it.value.sorted() }
 
     ScrollableAlertDialog(
         onDismissRequest = onDismissRequest,

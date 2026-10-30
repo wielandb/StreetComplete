@@ -23,6 +23,7 @@ fun FeatureSearchDialog(
     countryCode: String? = null,
     filterFn: (Feature) -> Boolean = { true },
     codesOfDefaultFeatures: List<String> = emptyList(),
+    showKeyboardOnFocus: Boolean = true,
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         AlertDialogLayout(
@@ -40,6 +41,7 @@ fun FeatureSearchDialog(
                         countryCode = countryCode,
                         filterFn = filterFn,
                         codesOfDefaultFeatures = codesOfDefaultFeatures,
+                        showKeyboardOnFocus = showKeyboardOnFocus,
                     )
                 }
             },

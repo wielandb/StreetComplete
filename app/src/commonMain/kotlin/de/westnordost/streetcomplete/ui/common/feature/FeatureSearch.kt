@@ -31,22 +31,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.westnordost.osmfeatures.Feature
 import de.westnordost.osmfeatures.FeatureDictionary
 import de.westnordost.osmfeatures.GeometryType
-import de.westnordost.streetcomplete.R
+import de.westnordost.streetcomplete.Prefs
+import de.westnordost.streetcomplete.data.meta.CountryInfos
+import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.resources.*
+import de.westnordost.streetcomplete.ui.LocalAppLocale
 import de.westnordost.streetcomplete.ui.common.CenteredLargeTitleHint
 import de.westnordost.streetcomplete.ui.common.ClearIcon
 import de.westnordost.streetcomplete.ui.common.SearchIcon
 import de.westnordost.streetcomplete.ui.common.VerticalDivider
 import de.westnordost.streetcomplete.ui.ktx.fadingVerticalScrollEdges
 import de.westnordost.streetcomplete.util.locale.getLanguagesForFeatureDictionary
+import de.westnordost.streetcomplete.util.locale.featureSearchLanguages
+import org.koin.compose.koinInject
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.painterResource
+import de.westnordost.streetcomplete.util.ktx.name
 
 /** A search field and a list of results for features below. */
 @Composable
@@ -58,15 +65,25 @@ fun FeatureSearch(
     countryCode: String? = null,
     filterFn: (Feature) -> Boolean = { true },
     codesOfDefaultFeatures: List<String> = emptyList(),
+    showKeyboardOnFocus: Boolean = true,
 ) {
-
+    val prefs: Preferences = koinInject()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+    LaunchedEffect(showKeyboardOnFocus) {
+        if (showKeyboardOnFocus) focusRequester.requestFocus()
     }
 
     var search by remember { mutableStateOf("") }
-    val languages = remember { getLanguagesForFeatureDictionary() }
+    val searchMoreLanguages = prefs.getBoolean(Prefs.SEARCH_MORE_LANGUAGES, false)
+    val countryLanguages = if (searchMoreLanguages && countryCode != null) {
+        val countryInfos: CountryInfos = koinInject()
+        remember(countryCode, countryInfos) {
+            countryInfos.get(listOf(countryCode, countryCode.substringBefore('-')).distinct()).officialLanguages
+        }
+    } else emptyList()
+    val languages = remember(LocalAppLocale.current, searchMoreLanguages, countryLanguages) {
+        featureSearchLanguages(getLanguagesForFeatureDictionary(), countryLanguages, searchMoreLanguages)
+    }
     val defaultFeatures = remember(codesOfDefaultFeatures, featureDictionary, languages, countryCode) {
         codesOfDefaultFeatures.mapNotNull { id ->
             featureDictionary.getById(
@@ -97,7 +114,11 @@ fun FeatureSearch(
             onValueChange = { search = it },
             modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             placeholder = {
-                Text(stringResource(Res.string.quest_shop_gone_replaced_answer_hint2))
+                Text(
+                    text = stringResource(Res.string.quest_shop_gone_replaced_answer_hint2),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             },
             leadingIcon = { SearchIcon() },
             trailingIcon = {
@@ -107,7 +128,7 @@ fun FeatureSearch(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions.Default.copy(
-                showKeyboardOnFocus = true,
+                showKeyboardOnFocus = showKeyboardOnFocus,
                 imeAction = ImeAction.None,
                 hintLocales = LocaleList.current,
             ),
@@ -161,6 +182,7 @@ private fun FeaturesColumn(
     LazyColumn(
         modifier = modifier
             .fadingVerticalScrollEdges(state.scrollIndicatorState, 32.dp),
+        state = state,
     ) {
         items(features) { feature ->
             Box(Modifier
@@ -197,18 +219,18 @@ private fun IconFeaturesColumn(
                 .clickable { onClickFeature(feature) }
                 .padding(horizontal = 4.dp, vertical = 8.dp)
             ) {
-                val icon = iconOnlyFeatures[feature.id] ?: R.drawable.preset_maki_marker_stroked
+                val icon = iconOnlyFeatures[feature.id] ?: Res.drawable.preset_maki_marker_stroked
                 val tint: Color = LocalContentColor.current.copy(alpha = LocalContentAlpha.current)
-                if (LocalResources.current.getResourceEntryName(icon).startsWith("preset_"))
+                if (icon.name.startsWith("preset_"))
                     Icon(
-                        painter = androidx.compose.ui.res.painterResource(icon),
+                        painter = painterResource(icon),
                         contentDescription = null,
                         modifier = modifier.align(Alignment.Center),
                         tint = tint,
                     )
                 else
                     Image(
-                        painter = androidx.compose.ui.res.painterResource(icon),
+                        painter = painterResource(icon),
                         contentDescription = null,
                         modifier = modifier.align(Alignment.Center),
                     )
@@ -217,51 +239,47 @@ private fun IconFeaturesColumn(
     }
 }
 
-// todo (from old dialog)
-//  optional position for local language
-//  but this requires countryInfos, which are currently Android only
-
 // todo: weird mix of pin icons, quest icons, temaki icons
 //  ideally all would be same style, especially avoid monochrome temaki icons
 //  the colors really help a lot for finding the right icon very quickly
 private val iconOnlyFeatures = mapOf(
-    "amenity/bench" to R.drawable.preset_temaki_bench,
-    "amenity/lounger" to R.drawable.preset_temaki_lounger,
-    "amenity/bicycle_parking" to R.drawable.quest_bicycle_parking,
-    "amenity/motorcycle_parking" to R.drawable.quest_motorcycle_parking,
-    "leisure/picnic_table" to R.drawable.preset_maki_picnic_site,
-    "amenity/waste_basket" to R.drawable.preset_maki_waste_basket,
-    "amenity/recycling_container" to R.drawable.quest_recycling_container,
-    "amenity/bicycle_repair_station" to R.drawable.quest_bicycle_repair,
-    "amenity/drinking_water" to R.drawable.quest_drinking_water,
-    "emergency/fire_hydrant" to R.drawable.quest_fire_hydrant,
-    "amenity/vending_machine" to R.drawable.preset_temaki_vending_machine,
-    "amenity/vending_machine/cigarettes" to R.drawable.preset_temaki_vending_cigarettes,
-    "amenity/vending_machine/excrement_bags" to R.drawable.preset_temaki_vending_pet_waste,
-    "amenity/vending_machine/public_transport_tickets" to R.drawable.preset_temaki_vending_tickets,
-    "amenity/vending_machine/drinks" to R.drawable.preset_temaki_vending_cold_drink,
-    "amenity/atm" to R.drawable.quest_money,
-    "natural/tree" to R.drawable.quest_tree,
-    "tourism/information/guidepost" to R.drawable.quest_destination,
-    "amenity/post_box" to R.drawable.quest_mail,
-    "amenity/charging_station" to R.drawable.quest_car_charger,
-    "highway/street_lamp" to R.drawable.preset_temaki_street_lamp_arm,
-    "man_made/surveillance/camera" to R.drawable.quest_surveillance_camera,
-    "highway/speed_camera" to R.drawable.preset_temaki_security_camera,
-    "highway/crossing/unmarked" to R.drawable.quest_pedestrian,
-    "highway/crossing/uncontrolled" to R.drawable.quest_pedestrian_crossing,
-    "highway/crossing/traffic_signals" to R.drawable.quest_blind_traffic_lights_sound,
-    "highway/traffic_signals" to R.drawable.quest_traffic_lights,
-    "barrier/kerb" to R.drawable.quest_kerb_tactile_paving,
-    "barrier/kerb/flush" to R.drawable.preset_temaki_kerb_flush,
-    "barrier/kerb/rolled" to R.drawable.preset_temaki_kerb_rolled,
-    "barrier/kerb/raised" to R.drawable.preset_temaki_kerb_raised,
-    "barrier/kerb/lowered" to R.drawable.preset_temaki_kerb_lowered,
-    "barrier/bollard" to R.drawable.preset_temaki_bollard,
-    "traffic_calming/table" to R.drawable.preset_temaki_speed_table,
-    "traffic_calming/bump" to R.drawable.preset_temaki_speed_bump,
-    "entrance" to R.drawable.quest_door,
-    "highway/stop" to R.drawable.preset_temaki_stop,
-    "highway/give_way" to R.drawable.preset_temaki_yield,
-    "highway/bus_stop" to R.drawable.preset_temaki_bus,
+    "amenity/bench" to Res.drawable.preset_temaki_bench,
+    "amenity/lounger" to Res.drawable.preset_temaki_lounger,
+    "amenity/bicycle_parking" to Res.drawable.quest_bicycle_parking,
+    "amenity/motorcycle_parking" to Res.drawable.quest_motorcycle_parking,
+    "leisure/picnic_table" to Res.drawable.preset_maki_picnic_site,
+    "amenity/waste_basket" to Res.drawable.preset_maki_waste_basket,
+    "amenity/recycling_container" to Res.drawable.quest_recycling_container,
+    "amenity/bicycle_repair_station" to Res.drawable.quest_bicycle_repair,
+    "amenity/drinking_water" to Res.drawable.quest_drinking_water,
+    "emergency/fire_hydrant" to Res.drawable.quest_fire_hydrant,
+    "amenity/vending_machine" to Res.drawable.preset_temaki_vending_machine,
+    "amenity/vending_machine/cigarettes" to Res.drawable.preset_temaki_vending_cigarettes,
+    "amenity/vending_machine/excrement_bags" to Res.drawable.preset_temaki_vending_pet_waste,
+    "amenity/vending_machine/public_transport_tickets" to Res.drawable.preset_temaki_vending_tickets,
+    "amenity/vending_machine/drinks" to Res.drawable.preset_temaki_vending_cold_drink,
+    "amenity/atm" to Res.drawable.quest_money,
+    "natural/tree" to Res.drawable.quest_tree,
+    "tourism/information/guidepost" to Res.drawable.quest_destination,
+    "amenity/post_box" to Res.drawable.quest_mail,
+    "amenity/charging_station" to Res.drawable.quest_car_charger,
+    "highway/street_lamp" to Res.drawable.preset_temaki_street_lamp_arm,
+    "man_made/surveillance/camera" to Res.drawable.quest_surveillance_camera,
+    "highway/speed_camera" to Res.drawable.preset_temaki_security_camera,
+    "highway/crossing/unmarked" to Res.drawable.quest_pedestrian,
+    "highway/crossing/uncontrolled" to Res.drawable.quest_pedestrian_crossing,
+    "highway/crossing/traffic_signals" to Res.drawable.quest_blind_traffic_lights_sound,
+    "highway/traffic_signals" to Res.drawable.quest_traffic_lights,
+    "barrier/kerb" to Res.drawable.quest_kerb_tactile_paving,
+    "barrier/kerb/flush" to Res.drawable.preset_temaki_kerb_flush,
+    "barrier/kerb/rolled" to Res.drawable.preset_temaki_kerb_rolled,
+    "barrier/kerb/raised" to Res.drawable.preset_temaki_kerb_raised,
+    "barrier/kerb/lowered" to Res.drawable.preset_temaki_kerb_lowered,
+    "barrier/bollard" to Res.drawable.preset_temaki_bollard,
+    "traffic_calming/table" to Res.drawable.preset_temaki_speed_table,
+    "traffic_calming/bump" to Res.drawable.preset_temaki_speed_bump,
+    "entrance" to Res.drawable.quest_door,
+    "highway/stop" to Res.drawable.preset_temaki_stop,
+    "highway/give_way" to Res.drawable.preset_temaki_yield,
+    "highway/bus_stop" to Res.drawable.preset_temaki_bus,
 )

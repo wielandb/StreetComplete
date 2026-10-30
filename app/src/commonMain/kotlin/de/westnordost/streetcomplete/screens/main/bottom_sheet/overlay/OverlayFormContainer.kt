@@ -3,13 +3,11 @@ package de.westnordost.streetcomplete.screens.main.bottom_sheet.overlay
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import de.westnordost.streetcomplete.data.meta.CountryInfos
 import de.westnordost.streetcomplete.data.meta.get
 import de.westnordost.streetcomplete.data.osm.edits.ElementEditAction
@@ -25,6 +23,9 @@ import de.westnordost.streetcomplete.data.osm.mapdata.Node
 import de.westnordost.streetcomplete.data.osm.mapdata.Way
 import de.westnordost.streetcomplete.data.overlays.Action
 import de.westnordost.streetcomplete.data.overlays.Edit
+import de.westnordost.streetcomplete.data.overlays.LeaveNoteForElement
+import de.westnordost.streetcomplete.data.osm.edits.MapDataWithEditsSource
+import de.westnordost.streetcomplete.data.osm.mapdata.ElementKey
 import de.westnordost.streetcomplete.data.overlays.Overlay
 import de.westnordost.streetcomplete.data.overlays.OverlayAction
 import de.westnordost.streetcomplete.osm.AccessManagerDialog
@@ -34,13 +35,14 @@ import de.westnordost.streetcomplete.screens.main.bottom_sheet.move_node.MoveNod
 import de.westnordost.streetcomplete.screens.main.bottom_sheet.note.LeaveNoteInsteadForm
 import de.westnordost.streetcomplete.screens.main.bottom_sheet.split_way.SplitWayForm
 import de.westnordost.streetcomplete.ui.common.quest.LocalElement
-import de.westnordost.streetcomplete.ui.common.quest.LocalGetOffsetCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalLastMapClick
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMarkersCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMetersPerDp
+import de.westnordost.streetcomplete.ui.common.quest.LocalMapOverlayCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapRotation
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapTilt
 import de.westnordost.streetcomplete.ui.common.quest.MapClick
+import de.westnordost.streetcomplete.ui.common.quest.MapOverlayContent
 import de.westnordost.streetcomplete.ui.common.quest.Marker
 import de.westnordost.streetcomplete.ui.util.ReplaceBottomSheetTransitionSpec
 import de.westnordost.streetcomplete.ui.util.rememberSerializable
@@ -56,64 +58,80 @@ import org.koin.compose.koinInject
  *  @param onSetMapMarkers is called when the form shown wishes to show markers on the map. E.g. the
  *         split way form shows markers.
  *
- *  @param getOffset returns the offset on the screen of the given position
+ *  @param onSetMapOverlay is called with content the form shown wishes to place on the map,
+ *         see [OnMap]
  *  */
 @Composable
 fun OverlayFormContainer(
     onDismiss: () -> Unit,
-    onEdit: (action: ElementEditAction, isTagEdit: Boolean, isEditInContextOf: Boolean) -> Unit,
-    onLeaveNote: (noteText: String, noteImagePaths: List<String>, isGpx: Boolean) -> Unit,
+    onEdit: (action: ElementEditAction, isTagEdit: Boolean, isEditInContextOf: Boolean, geometry: ElementGeometry?) -> Unit,
+    onLeaveNote: (noteText: String, noteImagePaths: List<String>, isGpx: Boolean, position: LatLon?) -> Unit,
     overlay: Overlay,
     element: Element?,
     geometry: ElementGeometry?,
-    geometryOffsetInWindow: Offset?,
     mapRotation: Float,
     mapTilt: Float,
     mapPosition: LatLon,
     mapMetersPerDp: Double,
-    onSetMapMarkers: (Iterable<Marker>) -> Unit,
-    getOffset: (position: LatLon) -> Offset?,
+    onSetMapMarkers: (Iterable<Marker>?) -> Unit,
+    onSetMapOverlay: (MapOverlayContent?) -> Unit,
     lastMapClick: MapClick?,
     modifier: Modifier = Modifier,
     countryBoundaries: CountryBoundaries = koinInject(),
     countryInfos: CountryInfos = koinInject(),
+    mapDataSource: MapDataWithEditsSource = koinInject(),
 ) {
     val geometry = geometry ?: ElementPointGeometry(mapPosition)
     val countryInfo = remember { countryInfos.get(countryBoundaries, geometry.center) }
     var state by rememberSerializable { mutableStateOf<OverlayFormState>(OverlayFormState.Overlay) }
+    var noteTargetKey by rememberSerializable { mutableStateOf<ElementKey?>(null) }
+    var notePosition by rememberSerializable { mutableStateOf<LatLon?>(null) }
     var showAccessManager by remember { mutableStateOf(false) }
     var showConstructionDialog by remember { mutableStateOf(false) }
 
-    // markers shown are per-form
-    LaunchedEffect(state) { onSetMapMarkers(emptyList()) }
+    fun showForm(form: OverlayFormState) {
+        state = form
+        onSetMapMarkers(null)
+        onSetMapOverlay(null)
+    }
 
     fun onAction(action: OverlayAction) {
         when (action) {
             Action.Dismiss -> onDismiss()
-            Action.LeaveNote -> state = OverlayFormState.LeaveNote
-            Action.SplitWay -> state = OverlayFormState.SplitWay
-            Action.MoveNode -> state = OverlayFormState.MoveNode
-            Action.EditTags -> state = OverlayFormState.EditTags
+            Action.LeaveNote -> {
+                noteTargetKey = null
+                notePosition = null
+                showForm(OverlayFormState.LeaveNote)
+            }
+            is LeaveNoteForElement -> {
+                noteTargetKey = action.element.key
+                notePosition = action.geometry.center
+                showForm(OverlayFormState.LeaveNote)
+            }
+            Action.SplitWay -> showForm(OverlayFormState.SplitWay)
+            Action.MoveNode -> showForm(OverlayFormState.MoveNode)
+            Action.EditTags -> showForm(OverlayFormState.EditTags)
             Action.ManageAccess -> showAccessManager = true
             Action.UnderConstruction -> showConstructionDialog = true
-            is Edit -> onEdit(action.value, false, false)
+            is Edit -> onEdit(action.value, action.isTagEdit, false, action.geometry)
         }
     }
 
-    CompositionLocalProvider(
-        LocalElement provides element,
-        LocalMapRotation provides mapRotation,
-        LocalMapTilt provides mapTilt,
-        LocalMapMetersPerDp provides mapMetersPerDp,
-        LocalMapMarkersCallback provides onSetMapMarkers,
-        LocalGetOffsetCallback provides getOffset,
-        LocalLastMapClick provides lastMapClick,
-    ) {
-        AnimatedContent(
-            targetState = state,
-            transitionSpec = ReplaceBottomSheetTransitionSpec,
-            modifier = modifier,
-        ) { currentState ->
+    AnimatedContent(
+        targetState = state,
+        transitionSpec = ReplaceBottomSheetTransitionSpec,
+        modifier = modifier,
+    ) { currentState ->
+        CompositionLocalProvider(
+            LocalElement provides element,
+            LocalMapRotation provides mapRotation,
+            LocalMapTilt provides mapTilt,
+            LocalMapMetersPerDp provides mapMetersPerDp,
+            LocalLastMapClick provides lastMapClick,
+            // AnimatedContent keeps the outgoing form alive until its transition ends.
+            LocalMapMarkersCallback provides { if (currentState == state) onSetMapMarkers(it) },
+            LocalMapOverlayCallback provides { if (currentState == state) onSetMapOverlay(it) },
+        ) {
             when (currentState) {
                 OverlayFormState.Overlay -> {
                     overlay.Form(
@@ -126,16 +144,16 @@ fun OverlayFormContainer(
                 OverlayFormState.LeaveNote -> {
                     LeaveNoteInsteadForm(
                         onLeaveNote = { text, noteImagePaths, isGpx ->
-                            onLeaveNote(text, noteImagePaths, isGpx)
+                            onLeaveNote(text, noteImagePaths, isGpx, notePosition)
                         },
                         onDismiss = onDismiss,
                         editType = overlay,
-                        element = element,
+                        element = noteTargetKey?.let { mapDataSource.get(it.type, it.id) } ?: element,
                     )
                 }
                 OverlayFormState.SplitWay -> {
                     SplitWayForm(
-                        onConfirmed = { onEdit(SplitWayAction(element, it), false, true) },
+                        onConfirmed = { onEdit(SplitWayAction(element, it), false, true, null) },
                         onDismiss = onDismiss,
                         mapPosition = mapPosition,
                         way = element as Way,
@@ -144,17 +162,15 @@ fun OverlayFormContainer(
                 }
                 OverlayFormState.MoveNode -> {
                     MoveNodeForm(
-                        onConfirmed = { onEdit(MoveNodeAction(element, it), false, true) },
+                        onConfirmed = { onEdit(MoveNodeAction(element, it), false, true, null) },
                         onDismiss = onDismiss,
                         mapPosition = mapPosition,
-                        nodeOffsetInWindow = geometryOffsetInWindow,
                         node = element as Node,
-                        elementEditType = overlay,
                     )
                 }
                 OverlayFormState.EditTags -> {
                     EditTagsForm(
-                        onConfirmed = { onEdit(UpdateElementTagsAction(element!!, it), true, false) },
+                        onConfirmed = { onEdit(UpdateElementTagsAction(element!!, it), true, false, null) },
                         onDismiss = onDismiss,
                     )
                 }
@@ -167,14 +183,14 @@ fun OverlayFormContainer(
             tags = element!!.tags,
             countryInfo = countryInfo
         ) {
-            onEdit(UpdateElementTagsAction(element, it.create()), false, true)
+            onEdit(UpdateElementTagsAction(element, it.create()), false, true, null)
         }
     }
     if (showConstructionDialog) {
         ConstructionDialog(
             onDismissRequest = { showConstructionDialog = false },
             element = element!!,
-            onEdit = { onEdit(UpdateElementTagsAction(element, it), false, true) }
+            onEdit = { onEdit(UpdateElementTagsAction(element, it), false, true, null) }
         )
     }
 }

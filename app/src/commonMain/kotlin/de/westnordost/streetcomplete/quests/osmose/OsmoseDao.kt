@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.quests.osmose
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 import androidx.compose.ui.text.intl.LocaleList
 import de.westnordost.streetcomplete.ApplicationConstants.USER_AGENT
 import de.westnordost.streetcomplete.data.ConflictAlgorithm
@@ -41,8 +43,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.url
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.io.IOException
-import java.util.Locale
+import kotlinx.io.IOException
 
 @Mockable
 class OsmoseDao(
@@ -265,8 +266,8 @@ private fun CursorPosition.toOsmoseIssue() = OsmoseIssue(
     getInt(ITEM),
     getInt(CLASS),
     getInt(LEVEL),
-    getString(TITLE).intern(),
-    getString(SUBTITLE).intern(),
+    getString(TITLE).internString(),
+    getString(SUBTITLE).internString(),
     LatLon(getDouble(LATITUDE), getDouble(LONGITUDE)),
     parseElementKeys(getString(ELEMENTS))
 )

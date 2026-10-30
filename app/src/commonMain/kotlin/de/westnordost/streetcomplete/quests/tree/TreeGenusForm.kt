@@ -1,15 +1,17 @@
 package de.westnordost.streetcomplete.quests.tree
 
-import android.content.Context
+import de.westnordost.streetcomplete.util.platform.internString
+
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import de.westnordost.streetcomplete.data.osm.edits.MapDataWithEditsSource
 import de.westnordost.streetcomplete.data.osm.mapdata.Node
@@ -29,27 +31,32 @@ import de.westnordost.streetcomplete.ui.theme.largeInput
 import de.westnordost.streetcomplete.util.math.distanceTo
 import de.westnordost.streetcomplete.util.math.enclosingBoundingBox
 import de.westnordost.streetcomplete.util.takeFavorites
+import de.westnordost.streetcomplete.util.platform.normalizeToNfd
+import de.westnordost.streetcomplete.util.logs.Log
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.filesDir
 import io.github.vinceglb.filekit.readString
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import java.io.IOException
-import java.text.Normalizer
-import java.util.Locale
-import java.util.regex.Pattern
 
 @Composable
 fun TreeGenusForm(on: (QuestAction<TreeAnswer>) -> Unit) {
-    if (treeSet.isEmpty()) loadTrees(LocalContext.current)
+    val revision by treeDataRevision.collectAsState()
+    val treeSet by produceState<Set<Tree>>(emptySet(), revision) {
+        value = withContext(Dispatchers.IO) { loadTrees() }
+    }
     var name by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     var selectedTree by remember { mutableStateOf<Tree?>(null) }
     val prefs: Preferences = koinInject()
     val lastPicked = remember { prefs.getLastPicked<String>("AddTreeGenusForm").takeFavorites(20, 50, 1) }
-    LaunchedEffect(name) { selectedTree = getSelectedTree(name.text.trim(), lastPicked) }
+    LaunchedEffect(name, treeSet) { selectedTree = getSelectedTree(name.text.trim(), lastPicked, treeSet) }
 
     val mapDataSource: MapDataWithEditsSource = koinInject()
     val mapClick = LocalLastMapClick.current
@@ -68,7 +75,7 @@ fun TreeGenusForm(on: (QuestAction<TreeAnswer>) -> Unit) {
                     bestTree = Pair(name, distance)
             }
         }
-        val bestName = bestTree?.let { getTrees(it.first, lastPicked).firstOrNull()?.toDisplayString() }
+        val bestName = bestTree?.let { getTrees(it.first, lastPicked, treeSet).firstOrNull()?.toDisplayString() }
         if (bestName != null) name = TextFieldValue(bestName)
     }
 
@@ -87,7 +94,7 @@ fun TreeGenusForm(on: (QuestAction<TreeAnswer>) -> Unit) {
         AutoCompleteTextField(
             value = name,
             onValueChange = { name = it },
-            suggestions = getTrees(name.text.trim(), lastPicked).map { it.toDisplayString() },
+            suggestions = getTrees(name.text.trim(), lastPicked, treeSet).map { it.toDisplayString() },
             textStyle = MaterialTheme.typography.largeInput,
             startExpanded = true,
             startExpandedWithoutFocus = true,
@@ -96,25 +103,29 @@ fun TreeGenusForm(on: (QuestAction<TreeAnswer>) -> Unit) {
     }
 }
 
-private val treeSet = mutableSetOf<Tree>()
+internal val treeDataRevision = MutableStateFlow(0L)
 
-private fun loadTrees(context: Context) {
-    if (treeSet.isNotEmpty()) return
+private suspend fun loadTrees(): Set<Tree> {
+    val treeSet = mutableSetOf<Tree>()
     // load from file, assuming format: <Genus/Species> (<localName>)
     //  assume species if it contains a space character
     try {
         if (treeFile.exists())
-            runBlocking {
-                treeSet.addAll(treeFile.readString().lines().mapNotNull { it.toTree(it.substringBefore(" (").contains(" ")) })
-            }
-    } catch (_: Exception) { } // file may not exist, so an exception is no surprise
+            treeSet.addAll(treeFile.readString().lines().mapNotNull { it.toTree(it.substringBefore(" (").contains(" ")) })
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { Log.w("TreeGenusForm", "Cannot read custom tree list", e) }
 
     try {
-        context.assets.open("tree/otherDataGenus.txt").bufferedReader().lineSequence().mapNotNullTo(treeSet) { it.toTree(false) }
-        context.assets.open("tree/otherDataSpecies.txt").bufferedReader().lineSequence().mapNotNullTo(treeSet) { it.toTree(true) }
-        context.assets.open("tree/osmGenus.txt").bufferedReader().lineSequence().mapNotNullTo(treeSet) { it.toTree(false) }
-        context.assets.open("tree/osmSpecies.txt").bufferedReader().lineSequence().mapNotNullTo(treeSet) { it.toTree(true) }
-    } catch (_: IOException) { }
+        for ((file, isSpecies) in listOf(
+            "otherDataGenus.txt" to false, "otherDataSpecies.txt" to true,
+            "osmGenus.txt" to false, "osmSpecies.txt" to true,
+        )) {
+            Res.readBytes("files/tree/$file").decodeToString().lineSequence()
+                .mapNotNullTo(treeSet) { it.toTree(isSpecies) }
+        }
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { Log.w("TreeGenusForm", "Cannot read bundled tree list", e) }
+    return treeSet
 }
 
 private fun String.toTree(isSpecies: Boolean): Tree? {
@@ -123,14 +134,15 @@ private fun String.toTree(isSpecies: Boolean): Tree? {
     val localName = if (line.contains(" (") && line.contains(')'))
         line.substringAfter("(").substringBeforeLast(")")
     else null
-    return Tree(line.substringBefore(" (").intern(), isSpecies, localName)
+    return Tree(line.substringBefore(" (").internString(), isSpecies, localName)
 }
 
-private fun getTrees(fullSearch: String, lastPickedAnswers: List<String>): List<Tree> {
+private fun getTrees(fullSearch: String, lastPickedAnswers: List<String>, treeSet: Set<Tree>): List<Tree> {
     val search = fullSearch.trim()
     // not working, i need a tree with the same name and species, but local name?
     if (search.isEmpty()) return lastPickedAnswers.mapNotNull { answer ->
         val treeString = answer.split('§')
+        if (treeString.size != 2) return@mapNotNull null
         treeSet.firstOrNull { it.name == treeString[1] && it.isSpecies == (treeString[0] == "true") }
     }
     return treeSet.filter { tree ->
@@ -143,18 +155,18 @@ private fun getTrees(fullSearch: String, lastPickedAnswers: List<String>): List<
     }.sortedBy { it.localName == null }.sortedBy { it.isSpecies }
 }
 
-val treeFile = PlatformFile(FileKit.filesDir, "trees.csv")
+val treeFile: PlatformFile get() = PlatformFile(FileKit.filesDir, "trees.csv")
 
-private fun getSelectedTree(input: String, lastPickedAnswers: List<String>): Tree? {
-    return getTrees(input, lastPickedAnswers).firstOrNull { canonicalize(it.toDisplayString()) == canonicalize(input) }
+private fun getSelectedTree(input: String, lastPickedAnswers: List<String>, treeSet: Set<Tree>): Tree? {
+    return getTrees(input, lastPickedAnswers, treeSet).firstOrNull { canonicalize(it.toDisplayString()) == canonicalize(input) }
 }
 
-private val FIND_DIACRITICS: Pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
+private val FIND_DIACRITICS = Regex("[\\u0300-\\u036f]+")
 
 private fun canonicalize(str: String): String {
-    return stripDiacritics(str).lowercase(Locale.US)
+    return stripDiacritics(str).lowercase()
 }
 
 private fun stripDiacritics(str: String): String {
-    return FIND_DIACRITICS.matcher(Normalizer.normalize(str, Normalizer.Form.NFD)).replaceAll("")
+    return FIND_DIACRITICS.replace(str.normalizeToNfd(), "")
 }

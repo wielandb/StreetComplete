@@ -12,7 +12,7 @@ import de.westnordost.streetcomplete.osm.Tags
 import de.westnordost.streetcomplete.osm.updateWithCheckDate
 import de.westnordost.streetcomplete.resources.*
 
-class AddWheelchairAccessOutside : OsmFilterQuestType<WheelchairAccess>() {
+class AddWheelchairAccessOutside : OsmFilterQuestType<WheelchairAccessAnswer>() {
 
     override val elementFilter = """
         nodes, ways, relations with
@@ -34,12 +34,12 @@ class AddWheelchairAccessOutside : OsmFilterQuestType<WheelchairAccess>() {
     override val hint = Res.string.quest_wheelchairAccess_limited_description_outside
 
     @Composable
-    override fun Form(on: (QuestAction<WheelchairAccess>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
+    override fun Form(on: (QuestAction<WheelchairAccessAnswer>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
         AddWheelchairAccessForm(on, countryInfo)
     }
 
-    override fun applyAnswerTo(answer: WheelchairAccess, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
-        tags.updateWithCheckDate("wheelchair", answer.osmValue)
+    override fun applyAnswerTo(answer: WheelchairAccessAnswer, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
+        tags.updateWithCheckDate("wheelchair", answer.access.osmValue)
         answer.updatedDescriptions?.forEach { (language, description) ->
             // language already contains the colon, or may be empty
             if (description.isBlank())

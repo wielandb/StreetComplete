@@ -5,13 +5,16 @@ import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import androidx.core.content.getSystemService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
 
 private typealias AndroidNetworkCapabilities = android.net.NetworkCapabilities
 
 class AndroidActiveNetworkConnection(private val context: Context) : ActiveNetworkConnection {
+    // ConnectivityManager uses synchronous Binder calls, which can stall during system startup.
     override val capabilities: Flow<NetworkCapabilities?> = callbackFlow {
         trySend(getCurrentCapabilities())
 
@@ -28,7 +31,7 @@ class AndroidActiveNetworkConnection(private val context: Context) : ActiveNetwo
         context.connectivityManager.registerDefaultNetworkCallback(networkCallback)
 
         awaitClose { context.connectivityManager.unregisterNetworkCallback(networkCallback) }
-    }
+    }.flowOn(Dispatchers.IO)
 
     private fun getCurrentCapabilities(): NetworkCapabilities? {
         val activeNetwork = context.connectivityManager.activeNetwork ?: return null

@@ -8,48 +8,52 @@ import de.westnordost.streetcomplete.util.ktx.now
 import de.westnordost.streetcomplete.util.ktx.toInstant
 import de.westnordost.streetcomplete.util.logs.Logger
 import kotlinx.datetime.LocalDateTime
+import kotlinx.atomicfu.locks.ReentrantLock
+import kotlinx.atomicfu.locks.withLock
 
 object TempLogger : Logger, LogsSource {
+    private val lock = ReentrantLock()
     override fun e(tag: String, message: String, exception: Throwable?) {
         if (exception == null) {
-            synchronized(logLines) { log(LogLine('E', tag, message)) }
+            log(LogLine('E', tag, message))
         } else {
-            synchronized(logLines) { log(LogLine('E', tag, "$message\n${exception.stackTraceToString()}")) }
+            log(LogLine('E', tag, "$message\n${exception.stackTraceToString()}"))
         }
     }
 
     override fun w(tag: String, message: String, exception: Throwable?) {
         if (exception == null) {
-            synchronized(logLines) { log(LogLine('W', tag, message)) }
+            log(LogLine('W', tag, message))
         } else {
-            synchronized(logLines) { log(LogLine('W', tag, "$message\n${exception.stackTraceToString()}")) }
+            log(LogLine('W', tag, "$message\n${exception.stackTraceToString()}"))
         }
     }
 
     override fun i(tag: String, message: String) {
-        synchronized(logLines) { log(LogLine('I', tag, message)) }
+        log(LogLine('I', tag, message))
     }
 
     override fun d(tag: String, message: String) {
-        synchronized(logLines) { log(LogLine('D', tag, message)) }
+        log(LogLine('D', tag, message))
     }
 
     override fun v(tag: String, message: String) {
-        synchronized(logLines) { log(LogLine('V', tag, message)) }
+        log(LogLine('V', tag, message))
     }
 
     private fun log(line: LogLine) {
-        synchronized(logLines) {
+        lock.withLock {
             if (logLines.size > 12000) // clear oldest entries if list gets too long
                 logLines.subList(0, 2000).clear()
             logLines.add(line)
         }
+        listeners.forEach { it.onAdded(line.toLogMessage()) }
     }
 
     private val logLines: MutableList<LogLine> = ArrayList(2000)
 
     /** returns a copy of [logLines] */
-    fun getLog() = synchronized(logLines) { logLines.toList() }
+    fun getLog() = lock.withLock { logLines.toList() }
 
     override fun getLogs(
         levels: Set<LogLevel>,
@@ -58,22 +62,14 @@ object TempLogger : Logger, LogsSource {
         olderThan: Long?
     ): List<LogMessage> {
         val charLevels = levels.mapTo(hashSetOf()) { it.toChar() }
-        return synchronized(logLines) {
+        return lock.withLock {
             logLines.asSequence().filter {
                 if (it.level !in charLevels) return@filter false
                 if (messageContains != null && !it.message.contains(messageContains, true))return@filter false
                 if (newerThan != null && it.time.toInstant().toEpochMilliseconds() < newerThan) return@filter false
                 if (olderThan != null && it.time.toInstant().toEpochMilliseconds() > olderThan) return@filter false
                 true
-            }.map { line ->
-                LogMessage(
-                    LogLevel.entries.first { it.toChar() == line.level },
-                    line.tag,
-                    line.message,
-                    null,
-                    line.time.toInstant().toEpochMilliseconds()
-                )
-            }.toList()
+            }.map { it.toLogMessage() }.toList()
         }
     }
 
@@ -90,6 +86,10 @@ object TempLogger : Logger, LogsSource {
 
 data class LogLine(val level: Char, val tag: String, val message: String,) {
     val time = LocalDateTime.now()
+    fun toLogMessage() = LogMessage(
+        LogLevel.entries.first { it.toChar() == level }, tag, message, null,
+        time.toInstant().toEpochMilliseconds()
+    )
     override fun toString(): String = // should look like a normal android log line
         "${time.toString().replace('T', ' ')} $level $tag: $message"
 }

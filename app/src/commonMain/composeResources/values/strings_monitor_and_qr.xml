@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="qr_scan_permission_required">Allow camera access for SCEE in system settings to scan QR codes.</string>
+    <string name="qr_camera_unavailable">The camera is not available for scanning QR codes.</string>
+    <string name="quest_monitor_background_access">To notify you about nearby quests while SCEE is in the background, open the location permission in app settings and choose “%1$s”.</string>
+    <string name="quest_monitor_permission_required">Allow precise location access and notifications for SCEE in system settings to use the nearby quest monitor.</string>
+    <string name="quest_monitor_high_accuracy">Use high accuracy location (uses more battery)</string>
+</resources>

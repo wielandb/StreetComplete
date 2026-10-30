@@ -2,7 +2,6 @@ package de.westnordost.streetcomplete
 
 import de.westnordost.streetcomplete.ApplicationConstants.MAX_UNDO_HISTORY_AGE
 import de.westnordost.streetcomplete.data.FeedsUpdater
-import de.westnordost.streetcomplete.data.PeriodicCleaner
 import de.westnordost.streetcomplete.data.Preloader
 import de.westnordost.streetcomplete.data.download.tiles.DownloadedTilesController
 import de.westnordost.streetcomplete.data.edithistory.EditHistoryController
@@ -32,12 +31,15 @@ class ApplicationInitializer(
     private val downloadedTilesController: DownloadedTilesController,
     private val prefs: Preferences,
     private val resurveyIntervalsUpdater: ResurveyIntervalsUpdater,
+    private val appLocaleUpdater: AppLocaleUpdater,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + CoroutineName("Application"))
 
     fun initialize() {
 
         setLoggerInstances()
+
+        appLocaleUpdater.start()
 
         resurveyIntervalsUpdater.update()
 
@@ -56,23 +58,23 @@ class ApplicationInitializer(
             prefs.lastDataVersion = BuildConfig.VERSION_NAME
             if (lastVersion != null) onNewVersion()
             // update prefs referring to renamed quests
-            val prefsToRename = Prefs.sharedPreferences.all.filter { pref ->
+            val prefsToRename = prefs.all.filter { pref ->
                 val v = pref.value
                 renamedQuests.keys.any { pref.key.contains(it) || (v is String && v.contains(it)) }
             }
-            val e = Prefs.sharedPreferences.edit()
-            prefsToRename.forEach {
-                e.remove(it.key)
-                when (it.value) {
-                    is String -> e.putString(it.key.renameUpdatedQuests(), (it.value as String).renameUpdatedQuests())
-                    is Boolean -> e.putBoolean(it.key.renameUpdatedQuests(), it.value as Boolean)
-                    is Int -> e.putInt(it.key.renameUpdatedQuests(), it.value as Int)
-                    is Long -> e.putLong(it.key.renameUpdatedQuests(), it.value as Long)
-                    is Float -> e.putFloat(it.key.renameUpdatedQuests(), it.value as Float)
-                    is Set<*> -> e.putStringSet(it.key.renameUpdatedQuests(), it.value as? Set<String>?)
+            prefsToRename.forEach { (oldKey, value) ->
+                val key = oldKey.renameUpdatedQuests()
+                when (value) {
+                    is String -> prefs.putString(key, value.renameUpdatedQuests())
+                    is Boolean -> prefs.putBoolean(key, value)
+                    is Int -> prefs.putInt(key, value)
+                    is Long -> prefs.putLong(key, value)
+                    is Float -> prefs.putFloat(key, value)
+                    is Double -> prefs.putDouble(key, value)
+                    else -> return@forEach
                 }
+                if (key != oldKey) prefs.remove(oldKey)
             }
-            e.apply()
         }
     }
 

@@ -1,12 +1,12 @@
 package de.westnordost.streetcomplete.quests.tree
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.Button
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,8 +33,9 @@ import io.github.vinceglb.filekit.exists
 import io.github.vinceglb.filekit.extension
 import io.github.vinceglb.filekit.nameWithoutExtension
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 
 class AddTreeGenus : OsmFilterQuestType<TreeAnswer>() {
@@ -74,17 +75,19 @@ class AddTreeGenus : OsmFilterQuestType<TreeAnswer>() {
     @Composable
     override fun QuestSettings(onDismissRequest: () -> Unit) {
         var showElementSelection by remember { mutableStateOf(false) }
-        val scope = rememberCoroutineScope { Dispatchers.IO }
+        val scope = rememberCoroutineScope()
+        val revision by treeDataRevision.collectAsState()
+        val hasTreeFile = remember(revision) { treeFile.exists() }
         fun import() {
             scope.launch {
                 val file = FileKit.openFilePicker() ?: return@launch
-                file.copyTo(treeFile)
+                withContext(Dispatchers.IO) { readFromFile(file) }
             }
         }
         fun export() {
             scope.launch {
                 val file = FileKit.openFileSaver(treeFile.nameWithoutExtension, defaultExtension = treeFile.extension) ?: return@launch
-                treeFile.copyTo(file)
+                withContext(Dispatchers.IO) { treeFile.copyTo(file) }
             }
         }
         InfoDialog(
@@ -96,7 +99,7 @@ class AddTreeGenus : OsmFilterQuestType<TreeAnswer>() {
                     Button({ import() }, Modifier.fillMaxWidth()) {
                         Text(stringResource(Res.string.tree_custom_quest_import))
                     }
-                    if (treeFile.exists())
+                    if (hasTreeFile)
                         Button({ export() }, Modifier.fillMaxWidth()) {
                             Text(stringResource(Res.string.tree_custom_quest_export))
                         }
@@ -111,6 +114,9 @@ class AddTreeGenus : OsmFilterQuestType<TreeAnswer>() {
     }
 
     companion object {
-        fun readFromUri(uri: Uri) = runBlocking { PlatformFile(uri).copyTo(treeFile) }
+        suspend fun readFromFile(file: PlatformFile) {
+            file.copyTo(treeFile)
+            treeDataRevision.value += 1
+        }
     }
 }

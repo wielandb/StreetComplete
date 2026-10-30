@@ -8,3 +8,10 @@ fun interpolateColors(color1: Color, color2: Color, progress: Float) = Color(
     blue = color1.blue * (1 - progress) + color2.blue * progress,
     alpha = color1.alpha * (1 - progress) + color2.alpha * progress,
 )
+
+/** Parses the #RRGGBB and #AARRGGBB forms used by OSM color palettes and overlays. */
+fun String.toArgbInt(): Int {
+    require(startsWith('#') && (length == 7 || length == 9)) { "Invalid hex color: $this" }
+    val value = substring(1).toLong(16)
+    return (if (length == 7) value or 0xff000000L else value).toInt()
+}

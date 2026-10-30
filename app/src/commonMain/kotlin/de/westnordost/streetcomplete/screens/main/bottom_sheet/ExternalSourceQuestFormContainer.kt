@@ -4,13 +4,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import de.westnordost.osmfeatures.FeatureDictionary
 import de.westnordost.streetcomplete.data.externalsource.ExternalSourceQuest
 import de.westnordost.streetcomplete.data.meta.CountryInfos
@@ -46,6 +44,10 @@ import de.westnordost.streetcomplete.ui.common.dialogs.ConfirmationDialog
 import de.westnordost.streetcomplete.ui.common.quest.CantSayDialog
 import de.westnordost.streetcomplete.ui.common.quest.ConfirmDeleteDialog
 import de.westnordost.streetcomplete.ui.common.quest.LocalElement
+import de.westnordost.streetcomplete.ui.common.quest.LocalLastMapClick
+import de.westnordost.streetcomplete.ui.common.quest.LocalMapOverlayCallback
+import de.westnordost.streetcomplete.ui.common.quest.MapClick
+import de.westnordost.streetcomplete.ui.common.quest.MapOverlayContent
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMarkersCallback
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapMetersPerDp
 import de.westnordost.streetcomplete.ui.common.quest.LocalMapRotation
@@ -75,12 +77,13 @@ fun ExternalSourceQuestFormContainer(
     onLeaveNote: (noteText: String, noteImagePaths: List<String>, isGpx: Boolean) -> Unit,
     onHideQuest: (tempHide: Boolean) -> Unit,
     quest: ExternalSourceQuest,
-    geometryOffsetInWindow: Offset?,
     mapPosition: LatLon?,
     mapRotation: Float,
     mapTilt: Float,
     mapMetersPerDp: Double,
-    onSetMapMarkers: (Iterable<Marker>) -> Unit,
+    onSetMapMarkers: (Iterable<Marker>?) -> Unit,
+    onSetMapOverlay: (MapOverlayContent?) -> Unit,
+    lastMapClick: MapClick?,
     modifier: Modifier = Modifier,
     countryBoundaries: CountryBoundaries = koinInject(),
     featureDictionary: FeatureDictionary = koinInject(),
@@ -99,13 +102,16 @@ fun ExternalSourceQuestFormContainer(
 
     var state by rememberSerializable { mutableStateOf<QuestFormState2>(QuestFormState2.Quest) }
 
-    // markers shown are per-form
-    LaunchedEffect(state) { onSetMapMarkers(emptyList()) }
+    fun showForm(form: QuestFormState2) {
+        state = form
+        onSetMapMarkers(null)
+        onSetMapOverlay(null)
+    }
 
     fun onAction(action: ExternalAction) {
         when (action) {
             Action.Dismiss -> onDismiss()
-            Action.LeaveNote -> state = QuestFormState2.LeaveNote
+            Action.LeaveNote -> showForm(QuestFormState2.LeaveNote)
             Action.HideQuest -> onHideQuest(false)
             Action.TempHideQuest -> onHideQuest(true)
             Action.CantSay -> confirmCantSay = true
@@ -113,7 +119,7 @@ fun ExternalSourceQuestFormContainer(
             Action.MoveNode -> confirmMoveNode = true
             Action.DeletePoi -> confirmDeletePoi = true
             Action.ReplacePoi -> confirmReplacePlace = true
-            Action.EditTags -> state = QuestFormState2.EditTags
+            Action.EditTags -> showForm(QuestFormState2.EditTags)
             Action.ManageAccess -> showAccessManager = true
             Action.UnderConstruction -> showConstructionDialog = true
             is AddNode -> onEdit(CreateNodeAction(action.node.position, action.node.tags))
@@ -124,19 +130,21 @@ fun ExternalSourceQuestFormContainer(
     val mapDataSource: MapDataWithEditsSource = koinInject()
     val element = remember { quest.elementKey?.let { mapDataSource.get(it.type, it.id) } }
 
-    CompositionLocalProvider(
-        LocalQuestType provides quest.type,
-        LocalElement provides element,
-        LocalMapRotation provides mapRotation,
-        LocalMapTilt provides mapTilt,
-        LocalMapMetersPerDp provides mapMetersPerDp,
-        LocalMapMarkersCallback provides onSetMapMarkers
-    ) {
-        AnimatedContent(
-            targetState = state,
-            transitionSpec = ReplaceBottomSheetTransitionSpec,
-            modifier = modifier,
-        ) { currentState ->
+    AnimatedContent(
+        targetState = state,
+        transitionSpec = ReplaceBottomSheetTransitionSpec,
+        modifier = modifier,
+    ) { currentState ->
+        CompositionLocalProvider(
+            LocalQuestType provides quest.type,
+            LocalElement provides element,
+            LocalMapRotation provides mapRotation,
+            LocalMapTilt provides mapTilt,
+            LocalMapMetersPerDp provides mapMetersPerDp,
+            LocalLastMapClick provides lastMapClick,
+            LocalMapMarkersCallback provides { if (currentState == state) onSetMapMarkers(it) },
+            LocalMapOverlayCallback provides { if (currentState == state) onSetMapOverlay(it) },
+        ) {
             when (currentState) {
                 QuestFormState2.Quest -> {
                     quest.type.Form(
@@ -170,9 +178,7 @@ fun ExternalSourceQuestFormContainer(
                         onConfirmed = { onEdit(MoveNodeAction(element, it)) },
                         onDismiss = onDismiss,
                         mapPosition = mapPosition,
-                        nodeOffsetInWindow = geometryOffsetInWindow,
                         node = element as Node,
-                        elementEditType = quest.type,
                     )
                 }
                 QuestFormState2.EditTags -> {
@@ -188,14 +194,14 @@ fun ExternalSourceQuestFormContainer(
     if (confirmSplitWay) {
         ConfirmationDialog(
             onDismissRequest = { confirmSplitWay = false },
-            onConfirmed = { state = QuestFormState2.SplitWay },
+            onConfirmed = { showForm(QuestFormState2.SplitWay) },
             text = { Text(stringResource(Res.string.quest_split_way_description)) }
         )
     }
     if (confirmMoveNode) {
         ConfirmationDialog(
             onDismissRequest = { confirmMoveNode = false },
-            onConfirmed = { state = QuestFormState2.MoveNode },
+            onConfirmed = { showForm(QuestFormState2.MoveNode) },
             text = { Text(stringResource(Res.string.quest_move_node_message)) }
         )
     }
@@ -216,7 +222,7 @@ fun ExternalSourceQuestFormContainer(
                         onEdit(UpdateElementTagsAction(element, builder.create()))
                     }
                     ShopTypeAnswer.LeaveNote -> {
-                        state = QuestFormState2.LeaveNote
+                        showForm(QuestFormState2.LeaveNote)
                     }
                 }
             },
@@ -232,14 +238,14 @@ fun ExternalSourceQuestFormContainer(
                 onEdit(DeletePoiNodeAction(element as Node))
             },
             onLeaveNote = {
-                state = QuestFormState2.LeaveNote
+                showForm(QuestFormState2.LeaveNote)
             }
         )
     }
     if (confirmCantSay) {
         CantSayDialog(
             onDismissRequest = { confirmCantSay = false },
-            onLeaveNote = { state = QuestFormState2.LeaveNote },
+            onLeaveNote = { showForm(QuestFormState2.LeaveNote) },
             onHideQuest = { onHideQuest(false) },
             onCreateCustomQuest = null
         )

@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.data.elementfilter.filters
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 /** Either works like a regex if there is a real regex in the string or otherwise as a set if the
  *  regex only consists of a string with pipes, e.g. bakery|pharmacy|clock */
 sealed class RegexOrSet {
@@ -11,7 +13,7 @@ sealed class RegexOrSet {
         fun from(string: String): RegexOrSet =
             if (!string.contains(anyRegexStuffExceptPipe)) {
                 val split = string.split('|')
-                SetRegex(HashSet<String>(split.size, 0.9f).apply { split.forEach { add(it.intern()) } })
+                SetRegex(HashSet<String>(split.size, 0.9f).apply { split.forEach { add(it.internString()) } })
             } else {
                 RealRegex(string.toRegex())
             }

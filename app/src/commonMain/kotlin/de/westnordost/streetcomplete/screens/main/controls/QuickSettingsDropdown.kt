@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import de.westnordost.streetcomplete.Prefs
+import de.westnordost.streetcomplete.data.osm.mapdata.LatLon
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.data.visiblequests.LevelFilter
 import de.westnordost.streetcomplete.resources.Res
@@ -31,6 +32,7 @@ fun QuickSettingsDropdown(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     viewModel: MainViewModel,
+    mapPosition: LatLon,
     modifier: Modifier = Modifier,
 ) {
     val levelFilter: LevelFilter = koinInject()
@@ -74,7 +76,7 @@ fun QuickSettingsDropdown(
     if (levelFilterDialog)
         LevelFilterDialog(
             { onDismissRequest(); levelFilterDialog = false },
-            viewModel.mapCamera.collectAsState().value
+            mapPosition
         )
     if (presetsDialog)
         ProfileSelectionDialog({ onDismissRequest(); presetsDialog = false })

@@ -1,21 +1,36 @@
 # Changelog
 
-## 64.0-alpha1
+## v64.0
 
-🍏 This update brings huge changes, albeit they should be mostly invisible. I re-did the UI for all 
-quest forms, a side effect of the migration to a multiplatform UI framework. An iOS version of the 
-app has now come within reach! (#6842).
-@kiliankoe (#6989), @maxwellward (#7033), @sargunv (#7123, #7124) helped a bit, too.
+Buckle up, this is the longest changelog we had for any version of StreetComplete, ever:
+
+### 🍎 iOS release! (#5421)
+
+Almost two years of waiting are over! This is the first stable version of StreetComplete on iOS 🎉, tell your friends! I am so relieved it is finally done 😮‍💨!
+
+In this release, the final pieces of the puzzle were put together:
+
+- 📌 I completed the migration to a multiplatform UI framework. As a side effect, I reworked the UI for a lot of quest forms (#6842). @kiliankoe (#6989), @maxwellward (#7033), @sargunv (#7123, #7124) helped a bit, too.
+- 🗺️ @sargunv and I ported the map and any interaction with it (#6352, #7088).
+- 🍏 And finally, @sargunv placed the app on a multiplatform base (#7125).
 
 ### General
 
-- Re-did UI for splitting ways: It is now based on the crosshair (like moving node and overlay) instead of tapping where to split
-- Improved UI for attaching tracks and images to a note and undoing the same
-- Now you must press "back" to close a quest form, clicking on the map will not close the form
-  anymore (this is a bit of a technical limitation of the new implementation)
-- Serbian language in Latin script is now available again (#6914)
+- ⚡ Improved quest creation processing speed after download by about 50% (#7099, #7277), by @paulklie
+- ✂️ Re-did UI for splitting ways: It is now based on the crosshair (like moving node and overlay) instead of tapping where to split
+- ⏺️ Improved UI for attaching tracks and images to a note and undoing the same
+- 🗺️ Monochrome POI icons with halo don't visually clump together on the map anymore when they are too close together, thanks @sargunv
 - All forms with free text input: Visually show error state when input exceeds 255 characters
-- Improved quest creation processing speed after download by about 50%! (#7099), by @paulklie
+- 🇷🇸 Serbian language in Latin script is now available again (#6914)
+- refer to Chinese (Simplified) and Chinese (Traditional) instead of Chinese and Chinese (Taiwan) (#7292)
+- ⚡ Reduce yank when animating between screens (#7194, #7193…), by @Amaanprobably, @sargunv
+- Support predictive back gesture (#7113), by @sargunv
+- 📍 Show button on map to return to currently focused element (#7195)
+- Add back button to dismissible onboarding screens (#7209)
+- Allow swiping between steps on all onboarding screens (#7198)
+- ⬅️ Back button on the bottom sheet title is now shown when the bottom sheet almost fills the whole screen (#7218)
+- Increase size of time picker in dialogs (#7144), by @Amaanprobably
+- Other small improvements (#7228, #7221…), thanks @Amaanprobably
 
 ### New Quests
 
@@ -23,24 +38,18 @@ app has now come within reach! (#6842).
 - _"What doctors are present here?"_ (#7044), by @paulklie
 - _"What type of vending machine is this?"_ (#7061), by @paulklie, thanks @Amaanprobably
 - _"Who may enter here?"_ (#7071, #7109), by @esilja. Replaces previous quests that asked for playground and tower access
+- _"What’s the surface here?"_, asked for motorcycle parkings (#7237, #6999, #6829), by @Amaanprobably, @ontheair81
+- _"How many sockets does this charging station have?"_ (#6732, #5164), thanks @mcliquid
+- _"Can cars be charged here?"_ (#7083, also #7098), by @paulklie. This and the above quest replace the quests that ask if and how many cars / bicycles can be charged at a charging station
+- _"Can you lock this while charging?"_, asked for bicycle charging stations etc. (#7189), by @paulklie
 
-### Fixes
+### Removed Problematic Quests
 
-- Fix crash when trying to report another crash via e-mail 😬 (#7052)
-- Post box was missing in things overlay (#6976)
-- Sharing logs no longer crashes when the log is too large (#5561)
-- UI now prevents possibility to create duplicate notes (#4853)
-- Context menus now appear at less wrong positions (#6665)
-- "Are you sure?" dialog had poor contrast in dark mode (#6753)
-- Fix rare crash in places overlay (#6648) 
-- Quest form used to not have padding for the camera notch (#6764)
-- Internet access: "none" option was not exclusive (#7016)
-- Fix formatting of links in notes (#7048)
-- Fix crash in postbox collection form when sending app to background
-- Other small (visual) fixes (#6827, #7007, #6981, #7070, #7074, #7115…), thanks @esilja, @paulklie
+- _"Are pedestrians forbidden to walk on this road without a sidewalk here?"_ (#7014)
 
 ### Quest improvements
 
+- ⛰️ **An absolute MOUNTAIN** of small improvements not specifically mentioned below, most by @paulklie: #6991, #6984, #7003, #7020, #7027, #7025, #7049, #7072, #7076, #7091, #7118, #7119, #7164, #7170, #7165, #7269, #7278, #7296, #7280, #7182, #7187, #7201, #7217, #7245…. Thanks also to @mcliquid
 - Parking fee: Don't ask for customer parking (#6996), by @paulklie
 - Parking access: Add "permit" as answer option (#2662, #7058), by @paulklie
 - Crossings: Don't ask for islands and kerb height on continuous crossings (#6983), by @eginhard
@@ -49,11 +58,53 @@ app has now come within reach! (#6842).
 - Many quests are also asked for relations now (#7086), by @paulklie
 - Toilets fee: Allow answering that there's a fee only for non-customers (#7050), by @esilja
 - Add a few icons for various quests (#7128, #7100), by @Amaanprobably
-- Other small improvements that improve clarity (#6991, #6984, #7003, #7020, #7027, #7025, #7049, #7072, #7076, #7091, #7118, #7119), thanks @paulklie, @mcliquid
+- Step count: Don't ask if step count is given already in another form (#7136, #7137, #7168), by @paulklie, @peternewman
+- Barrier opening: Add answer option "not suitable for wheelchairs" (#7127), by @kmpoppe
+- Level of things: Don't ask for things whose location is already known to be non-indoor (#7114)
+- Buildings: Can now select "terraced house" (#7159), by @Amaanprobably
+- Recycling materials: Pre-select prior selection on re-survey (#7102), by @paulklie
+- More quests highlight nearby related elements now (#7255), by @paulklie
+- Place & Street Name: if user explicitly specifies a language, also explicitly tag it that way (#7161)
+- Bike paths / Sidewalks / Lanes: Add tap hint for street side select UI (#7215), by @sargunv
 
-### Problematic Quests removed
+### Overlay improvements
 
-- _"Are pedestrians forbidden to walk on this road without a sidewalk here?"_ (#7014)
+- Buildings: Buildings are now shown in 3D again (#7153), by @paulklie
+- Things: Post box was missing (#6976)
+- Addresses: Don't tag `noaddress=yes` when removing an address (#7145)
+- Places: if user explicitly specifies a language for a name, also explicitly tag it that way (#7161)
+- Bike paths / Sidewalks / Parking: Add tap hint for street side select UI (#7215), by @sargunv
+
+### General Fixes
+
+- Quite a few small (visual) fixes (#6827, #7007, #6981, #7070, #7074, #7115…), thanks @esilja, @paulklie
+- Fix crash when trying to report another crash via e-mail 😬 (#7052)
+- Sharing logs no longer crashes when the log is too large (#5561)
+- UI now prevents possibility to create duplicate notes (#4853)
+- Context menus now appear at less wrong positions (#6665)
+- "Are you sure?" dialog had poor contrast in dark mode (#6753)
+- Quest forms used to not have padding for the camera notch (#6764)
+- Fix formatting of links in notes (#7048)
+- Fix zoom animation was sometimes interrupted by the map following the user's position (#5860), by @sargunv
+- Fix selected language was sometimes overwritten by system default language (#5942), by @sargunv
+- Fix avatar image didn't appear immediately after login
+- Fix settings screen background turning black on Android 7 (#7175), by @sargunv
+- Fix crash on Android when downloading more areas in quick succession (#7051)
+- Fix logs screen didn't reliably scroll to bottom when new logs arrived (#7233), by @sargunv
+
+### Quest fixes
+
+- Internet access: "none" option was not exclusive (#7016)
+- Postbox collection times: Fix crash in when sending app to background
+- Sidewalk surface: Upgrade ambiguous to explicit tagging correctly (#7138, #7139), by @Amaanprobably
+- Opening hours: Fix crash when editing times like 26:00 (#7246) (yeah, that's valid OSM syntax!)
+- Postbox collection times: Fix always asked whether to discard changes on exit even when nothing was input
+- Parking Fee: Fix never asked whether to discard changes on exit
+
+### Overlay fixes
+
+- Places: Fix two rare crashes in places overlay (#6648, #5809)
+- Parking: Fix a rendering issue
 
 ## v63.4
 

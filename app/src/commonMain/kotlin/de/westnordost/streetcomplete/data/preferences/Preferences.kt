@@ -21,10 +21,13 @@ import kotlinx.serialization.serializer
 import kotlin.reflect.KClass
 
 @Mockable
-class Preferences(val prefs: ObservableSettings) {
+class Preferences(settings: ObservableSettings) {
+    val prefs: SnapshotSettings = settings as? SnapshotSettings ?: SnapshotSettings(settings)
+
+    init { Prefs.preferences = this }
     // application settings
     var locale: Locale?
-        set(value) { prefs.putStringOrNull(LANGUAGE_SELECT, locale?.toLanguageTag()) }
+        set(value) { prefs.putStringOrNull(LANGUAGE_SELECT, value?.toLanguageTag()) }
         get() = prefs.getStringOrNull(LANGUAGE_SELECT)?.let { Locale(it) }
 
     var theme: Theme
@@ -62,9 +65,10 @@ class Preferences(val prefs: ObservableSettings) {
     fun putInt(key: String, value: Int) = prefs.putInt(key, value)
     fun getFloat(key: String, default: Float) = prefs.getFloat(key, default)
     fun putFloat(key: String, value: Float) = prefs.putFloat(key, value)
+    fun putDouble(key: String, value: Double) = prefs.putDouble(key, value)
     fun remove(key: String) = prefs.remove(key)
     fun contains(key: String) = prefs.contains(key)
-    val all: Map<String, *> get() = Prefs.sharedPreferences.all
+    val all: Map<String, Any?> get() = prefs.all
 
     var expertMode: Boolean by prefs.boolean(Prefs.EXPERT_MODE, false)
     var showQuickSettings: Boolean by prefs.boolean(Prefs.QUICK_SETTINGS, false)
@@ -270,7 +274,7 @@ class Preferences(val prefs: ObservableSettings) {
         private const val SHOW_ALL_NOTES = "display.nonQuestionNotes"
         private const val AUTOSYNC = "autosync"
         private const val KEEP_SCREEN_ON = "display.keepScreenOn"
-        private const val SHOW_ZOOM_BUTTONS = "display.zoomButtons"
+        internal const val SHOW_ZOOM_BUTTONS = "display.zoomButtons"
         const val THEME_SELECT = "theme.select"
         private const val LANGUAGE_SELECT = "language.select"
         private const val RESURVEY_INTERVALS = "quests.resurveyIntervals"

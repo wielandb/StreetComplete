@@ -3,6 +3,7 @@ package de.westnordost.streetcomplete.data.user.statistics
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.data.user.UserLoginSource
 import de.westnordost.streetcomplete.testutils.p
+import de.westnordost.streetcomplete.testutils.mockPrefs3
 import de.westnordost.streetcomplete.util.countryboundaries.CountryBoundaries
 import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
@@ -14,6 +15,8 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class StatisticsControllerImplTest {
 
@@ -40,7 +43,7 @@ class StatisticsControllerImplTest {
         currentWeekCountryStatisticsDao = mock()
         activeDatesDao = mock()
         countryBoundaries = mock()
-        prefs = mock()
+        prefs = mockPrefs3()
         listener = mock()
 
         userLoginSource = mock {
@@ -84,7 +87,7 @@ class StatisticsControllerImplTest {
 
     @Test fun `adding one one day later`() {
         every { countryBoundaries.getIds(any()) } returns listOf()
-        every { prefs.userLastTimestampActive } returns 0
+        prefs.userLastTimestampActive = 0
 
         statisticsController.addOne(questA, p(0.0, 0.0))
 
@@ -109,7 +112,7 @@ class StatisticsControllerImplTest {
 
     @Test fun `subtracting one one day later`() {
         every { countryBoundaries.getIds(any()) } returns listOf()
-        every { prefs.userLastTimestampActive } returns 0
+        prefs.userLastTimestampActive = 0
 
         statisticsController.subtractOne(questA, p(0.0, 0.0))
 
@@ -121,22 +124,32 @@ class StatisticsControllerImplTest {
     }
 
     @Test fun `mark as not synchronized on login`() {
+        prefs.statisticsSynchronizedOnce = true
         userLoginListener.onLoggedIn()
-        verify { prefs.statisticsSynchronizedOnce = false }    }
+        assertFalse(prefs.statisticsSynchronizedOnce)
+    }
 
     @Test fun `clear on logout`() {
+        val initialKeys = prefs.prefs.keys.toSet()
+        prefs.userDaysActive = 12
+        prefs.userActiveDatesRange = 30
+        prefs.isSynchronizingStatistics = true
+        prefs.userGlobalRank = 42
+        prefs.userGlobalRankCurrentWeek = 7
+        prefs.userLastTimestampActive = 123
+        prefs.statisticsSynchronizedOnce = true
         userLoginListener.onLoggedOut()
         verify { editTypeStatisticsDao.clear() }
         verify { countryStatisticsDao.clear() }
         verify { currentWeekCountryStatisticsDao.clear() }
         verify { currentWeekEditTypeStatisticsDao.clear() }
         verify { activeDatesDao.clear() }
-        verify { prefs.clearUserStatistics() }
+        assertEquals(initialKeys, prefs.prefs.keys)
         verify { listener.onCleared() }
     }
 
     @Test fun `update all`() {
-        every { prefs.statisticsSynchronizedOnce } returns false
+        prefs.statisticsSynchronizedOnce = false
         statisticsController.updateAll(Statistics(
             types = listOf(
                 EditTypeStatistics(questA, 123),
@@ -195,13 +208,13 @@ class StatisticsControllerImplTest {
                 LocalDate.parse("1888-01-02")
             ))
         }
-        verify { prefs.userActiveDatesRange = 12 }
-        verify { prefs.userDaysActive = 333 }
-        verify { prefs.isSynchronizingStatistics = false }
-        verify { prefs.userGlobalRank = 999 }
-        verify { prefs.userGlobalRankCurrentWeek = 111 }
-        verify { prefs.userLastTimestampActive = 9999999 }
-        verify { prefs.statisticsSynchronizedOnce = true }
+        assertEquals(12, prefs.userActiveDatesRange)
+        assertEquals(333, prefs.userDaysActive)
+        assertFalse(prefs.isSynchronizingStatistics)
+        assertEquals(999, prefs.userGlobalRank)
+        assertEquals(111, prefs.userGlobalRankCurrentWeek)
+        assertEquals(9999999L, prefs.userLastTimestampActive)
+        assertTrue(prefs.statisticsSynchronizedOnce)
         verify { listener.onUpdatedAll(true) }
     }
 }

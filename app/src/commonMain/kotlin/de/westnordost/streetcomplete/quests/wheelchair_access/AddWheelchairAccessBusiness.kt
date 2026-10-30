@@ -12,7 +12,7 @@ import de.westnordost.streetcomplete.osm.Tags
 import de.westnordost.streetcomplete.osm.places.isPlaceOrDisusedPlace
 import de.westnordost.streetcomplete.resources.*
 
-class AddWheelchairAccessBusiness : OsmFilterQuestType<WheelchairAccess>() {
+class AddWheelchairAccessBusiness : OsmFilterQuestType<WheelchairAccessAnswer>() {
 
     override val elementFilter = """
         nodes, ways, relations with
@@ -54,7 +54,6 @@ class AddWheelchairAccessBusiness : OsmFilterQuestType<WheelchairAccess>() {
                 "theatre",                                        // culture
                 "conference_centre", "arts_centre",               // events
                 "police",                                         // civic
-                "ferry_terminal",                                 // transport
                 "place_of_worship",                               // religious
                 "hospital",                                       // health care
                 "brothel", "gambling", "love_hotel", "stripclub", // bad stuff
@@ -130,12 +129,12 @@ class AddWheelchairAccessBusiness : OsmFilterQuestType<WheelchairAccess>() {
         mapData.asSequence().filter { it.isPlaceOrDisusedPlace() }
 
     @Composable
-    override fun Form(on: (QuestAction<WheelchairAccess>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
+    override fun Form(on: (QuestAction<WheelchairAccessAnswer>) -> Unit, element: Element, geometry: ElementGeometry, countryInfo: CountryInfo) {
         AddWheelchairAccessForm(on, countryInfo)
     }
 
-    override fun applyAnswerTo(answer: WheelchairAccess, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
-        tags["wheelchair"] = answer.osmValue
+    override fun applyAnswerTo(answer: WheelchairAccessAnswer, tags: Tags, geometry: ElementGeometry, timestampEdited: Long) {
+        tags["wheelchair"] = answer.access.osmValue
         answer.updatedDescriptions?.forEach { (language, description) ->
             // language already contains the colon, or may be empty
             if (description.isBlank())

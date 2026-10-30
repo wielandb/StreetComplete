@@ -1,6 +1,7 @@
 package de.westnordost.streetcomplete.screens.main.bottom_sheet
 
-import android.content.res.Resources
+import de.westnordost.streetcomplete.util.platform.internString
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
@@ -59,6 +58,7 @@ import de.westnordost.streetcomplete.data.osm.osmquests.OsmQuestController
 import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.resources.*
 import de.westnordost.streetcomplete.ui.common.FloatingOkButton
+import de.westnordost.streetcomplete.ui.common.NonPredictiveBackHandler
 import de.westnordost.streetcomplete.ui.common.auto_complete_text.AutoCompleteTextField
 import de.westnordost.streetcomplete.ui.common.bottom_sheet.BottomSheetFormScaffold
 import de.westnordost.streetcomplete.ui.common.dialogs.ConfirmDiscardDialog
@@ -68,18 +68,25 @@ import de.westnordost.streetcomplete.ui.common.quest.LocalQuestType
 import de.westnordost.streetcomplete.util.countryboundaries.CountryBoundaries
 import de.westnordost.streetcomplete.util.ktx.copy
 import de.westnordost.streetcomplete.util.ktx.nowAsEpochMilliseconds
+import de.westnordost.streetcomplete.util.ktx.toLocalDateTime
+import de.westnordost.streetcomplete.util.locale.LocalDateTimeFormatter
 import de.westnordost.streetcomplete.util.locale.getLanguagesForFeatureDictionary
 import de.westnordost.streetcomplete.util.logs.Log
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
-import java.text.DateFormat
-import java.util.Date
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -87,7 +94,8 @@ import kotlin.time.Duration.Companion.milliseconds
 fun EditTagsForm(
     onConfirmed: (StringMapChanges) -> Unit,
     onDismiss: () -> Unit,
-    originalElement: Element = LocalElement.current!!
+    originalElement: Element = LocalElement.current!!,
+    elementGeometry: ElementGeometry? = null
 ) {
     val mapDataSource: MapDataWithEditsSource = koinInject()
     val featureDictionary: FeatureDictionary = koinInject()
@@ -95,25 +103,30 @@ fun EditTagsForm(
     val osmQuestController: OsmQuestController = koinInject()
     val countryBoundaries: CountryBoundaries = koinInject()
     val countryInfos: CountryInfos = koinInject()
-    val geometry = mapDataSource.getGeometry(originalElement.type, originalElement.id) ?: ElementPointGeometry((originalElement as Node).position)
+    val geometry = elementGeometry ?: mapDataSource.getGeometry(originalElement.type, originalElement.id) ?: ElementPointGeometry((originalElement as Node).position)
     val countryInfo = remember { countryInfos.get(countryBoundaries, geometry.center) }
-    val resources = LocalResources.current
-    var updatedTags by rememberSaveable { mutableStateOf<Map<String, String>>(originalElement.tags.toSortedMap()) }
+    var updatedTags by rememberSaveable {
+        mutableStateOf(originalElement.tags.entries.sortedBy { it.key }.associate { it.key to it.value })
+    }
     val questElement = remember(updatedTags) { originalElement.copy(tags = updatedTags, timestampEdited = nowAsEpochMilliseconds()) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var shownQuest by remember { mutableStateOf<OsmQuest?>(null) }
-    BackHandler {
+    fun dismiss() {
         if (updatedTags != originalElement.tags) {
             confirmDiscard = true
         } else {
             onDismiss()
         }
     }
+    NonPredictiveBackHandler(isBackEnabled = shownQuest == null, onBackCompleted = ::dismiss)
+    var suggestionsReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { readSuggestions(); suggestionsReady = true }
     val lastFeature = remember { featureDictionary.byTags(updatedTags).isSuggestion(false).find().firstOrNull() }
-    val keySuggestions = remember { getKeySuggestions(lastFeature?.id, updatedTags, prefs, resources).toList() }
+    val keySuggestions = remember(suggestionsReady) { getKeySuggestions(lastFeature?.id, updatedTags, prefs).toList() }
 
     if (shownQuest == null) // better don't show behind the quest form, can still interact with some parts!
     BottomSheetFormScaffold(
+        onDismissRequest = ::dismiss,
         content = {
             ProvideTextStyle(MaterialTheme.typography.body1) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { // lazy column has infinite height, so we need a normal column
@@ -133,7 +146,7 @@ fun EditTagsForm(
                                 value = TextFieldValue(v)
 
                             var valueSuggestions by remember { mutableStateOf(listOf<String>()) }
-                            LaunchedEffect(key) {
+                            LaunchedEffect(key, suggestionsReady) {
                                 val suggestions = mutableListOf<String>()
                                 prefs.getString("EditTagsAdapter_${key.text}_values", "")
                                     .split("§§").forEach {
@@ -196,8 +209,9 @@ fun EditTagsForm(
                         }
                     }
                     if (originalElement.id != 0L) {
-                        val date = Date(originalElement.timestampEdited)
-                        val dateText = stringResource(Res.string.tag_editor_last_edited, DateFormat.getDateTimeInstance().format(date))
+                        val date = Instant.fromEpochMilliseconds(originalElement.timestampEdited).toLocalDateTime()
+                        val formatter = remember { LocalDateTimeFormatter() }
+                        val dateText = stringResource(Res.string.tag_editor_last_edited, formatter.format(date))
                         val url = "https://www.openstreetmap.org/${originalElement.type.name.lowercase()}/${originalElement.id}/history"
                         val text = buildAnnotatedString {
                             withLink(LinkAnnotation.Url(url)) {
@@ -222,7 +236,7 @@ fun EditTagsForm(
                                 ?.let { Json.decodeFromString(it) }
                             } catch (_: Exception) { null }
                             if (previousTagsForFeature?.isNotEmpty() == true && previousTagsForFeature != originalElement.tags)
-                                IconButton({ updatedTags = previousTagsForFeature.toSortedMap() }, Modifier.size(56.dp)) {
+                                IconButton({ updatedTags = previousTagsForFeature.entries.sortedBy { it.key }.associate { it.key to it.value } }, Modifier.size(56.dp)) {
                                     Icon(painterResource(Res.drawable.ic_undo_24), "redo", modifier = Modifier.scale(-0.7f, 0.7f))
                                 }
                         }
@@ -351,8 +365,7 @@ private fun tagsChangedAndOk(originalElement: Element, newTags: Map<String, Stri
 // characters that should not be in keys, see https://taginfo.openstreetmap.org/reports/characters_in_keys
 private val problematicKeyCharacters = "[\\s=+/&<>;'\"?%#@,\\\\]".toRegex()
 
-private fun getKeySuggestions(featureId: String?, tags: Map<String, String>, prefs: Preferences, resources: Resources): Collection<String> {
-    readSuggestions(resources)
+private fun getKeySuggestions(featureId: String?, tags: Map<String, String>, prefs: Preferences): Collection<String> {
     val suggestions = prefs.getString("EditTagsAdapter_${featureId}_keys", "").split("§§").filter { it.isNotEmpty() }.toMutableSet()
     if (featureId == null) return suggestions.filterNot { it in tags.keys }
     val fields = getMainSuggestions(featureId)
@@ -407,20 +420,29 @@ private fun getSecondarySuggestions(featureId: String): List<String> {
 private val keySuggestionsForFeatureId = hashMapOf<String, Pair<List<String>?, List<String>?>>()
 private val valueSuggestionsByKey = hashMapOf<String, List<String>>()
 
-private fun readSuggestions(resources: Resources) {
+private val suggestionsMutex = Mutex()
+
+private suspend fun readSuggestions() = withContext(Dispatchers.IO) { suggestionsMutex.withLock {
     if (keySuggestionsForFeatureId.isEmpty() && valueSuggestionsByKey.isEmpty()) {
         try {
-            val keySuggestions = resources.assets.open("tag_editor/keySuggestionsForFeature.json").reader().readText()
-            val valueSuggestions = resources.assets.open("tag_editor/valueSuggestionsByKey.json").reader().readText()
-            // filling maps twice is a bit inefficient, but there are so many duplicate strings that interning is worth it
-            Json.decodeFromString<Map<String, Pair<List<String>?, List<String>?>>>(keySuggestions).forEach {
-                keySuggestionsForFeatureId[it.key.intern()] = it.value.first?.map { it.intern() } to it.value.second?.map { it.intern() }
-            }
-            Json.decodeFromString<Map<String, List<String>>>(valueSuggestions).forEach {
-                valueSuggestionsByKey[it.key.intern()] = it.value.map { it.intern() }
-            }
+            val keySuggestions = Res.readBytes("files/tag_editor/keySuggestionsForFeature.json").decodeToString()
+            val valueSuggestions = Res.readBytes("files/tag_editor/valueSuggestionsByKey.json").decodeToString()
+            val parsedKeys = Json.decodeFromString<Map<String, Pair<List<String>?, List<String>?>>>(keySuggestions)
+            val parsedValues = Json.decodeFromString<Map<String, List<String>>>(valueSuggestions)
+            val newKeys = parsedKeys.map { (key, value) ->
+                key.internString() to (value.first?.map { it.internString() } to value.second?.map { it.internString() })
+            }.toMap()
+            val newValues = parsedValues.map { (key, values) ->
+                key.internString() to values.map { it.internString() }
+            }.toMap()
+            ensureActive()
+            // Populate caches only after both files are parsed, so failed loads can be retried.
+            keySuggestionsForFeatureId.putAll(newKeys)
+            valueSuggestionsByKey.putAll(newValues)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w("EditTagsForm", "failed to read and parse suggestions: ${e.message}")
         }
     }
-}
+} }

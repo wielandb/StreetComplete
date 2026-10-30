@@ -1,17 +1,48 @@
 package de.westnordost.streetcomplete.quests.sidewalk
 
+import de.westnordost.streetcomplete.Prefs
+import de.westnordost.streetcomplete.data.preferences.Preferences
 import de.westnordost.streetcomplete.data.osm.geometry.ElementPolylinesGeometry
 import de.westnordost.streetcomplete.testutils.TestMapDataWithGeometry
 import de.westnordost.streetcomplete.testutils.p
 import de.westnordost.streetcomplete.testutils.way
+import de.westnordost.streetcomplete.testutils.mockPrefs3
 import de.westnordost.streetcomplete.util.math.translate
 import kotlin.test.Test
+import kotlin.test.BeforeTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AddSidewalkTest {
 
     private val questType = AddSidewalk()
+
+    @BeforeTest fun setUp() {
+        Prefs.preferences = mockPrefs3()
+    }
+
+    @Test fun `custom highway selection excludes unselected untagged roads`() {
+        Prefs.preferences.putString("qs_AddSidewalk_highway_selection", "primary")
+        val road = way(tags = mapOf("highway" to "residential"))
+        assertEquals(false, questType.isApplicableTo(road))
+        assertTrue(questType.getApplicableElements(TestMapDataWithGeometry(listOf(road))).none())
+    }
+
+    @Test fun `custom highway selection includes selected service roads`() {
+        Prefs.preferences.putString("qs_AddSidewalk_highway_selection", "service")
+        val road = way(tags = mapOf("highway" to "service", "lit" to "yes"))
+        assertTrue(questType.isApplicableTo(road))
+        assertEquals(listOf(road), questType.getApplicableElements(TestMapDataWithGeometry(listOf(road))).toList())
+    }
+
+    @Test fun `custom highway selection uses selected preset`() {
+        Prefs.preferences.putBoolean(Prefs.QUEST_SETTINGS_PER_PRESET, true)
+        Prefs.preferences.putLong(Preferences.SELECTED_EDIT_TYPE_PRESET, 7)
+        Prefs.preferences.putString("qs_AddSidewalk_highway_selection", "residential")
+        Prefs.preferences.putString("7_qs_AddSidewalk_highway_selection", "service")
+        assertTrue(questType.isApplicableTo(way(tags = mapOf("highway" to "service", "lit" to "yes"))))
+        assertEquals(false, questType.isApplicableTo(way(tags = mapOf("highway" to "residential"))))
+    }
 
     @Test fun `not applicable to road with sidewalk`() {
         val road = way(tags = mapOf(

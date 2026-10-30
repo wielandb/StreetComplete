@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.data
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 /** A class where objects of a certain type are
  *  1. registered and can be recalled by class name
  *  2. or recalled by ordinal
@@ -16,7 +18,7 @@ open class ObjectTypeRegistry<T>(private val ordinalsAndEntries: List<Pair<Int, 
 
     protected fun reloadInit() {
         for ((ordinal, objectType) in ordinalsAndEntries) {
-            val typeName = objectType::class.simpleName!!.intern()
+            val typeName = objectType::class.simpleName!!.internString()
             require(!byName.containsKey(typeName)) {
                 "A object type's name must be unique! \"$typeName\" is defined twice!"
             }

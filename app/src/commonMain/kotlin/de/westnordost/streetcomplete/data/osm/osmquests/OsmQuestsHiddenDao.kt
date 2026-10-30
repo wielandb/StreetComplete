@@ -1,5 +1,7 @@
 package de.westnordost.streetcomplete.data.osm.osmquests
 
+import de.westnordost.streetcomplete.util.platform.internString
+
 import de.westnordost.streetcomplete.data.CursorPosition
 import de.westnordost.streetcomplete.data.Database
 import de.westnordost.streetcomplete.data.osm.mapdata.ElementType
@@ -63,7 +65,7 @@ private fun OsmQuestKey.toPairs() = listOf(
 private fun CursorPosition.toOsmQuestKey() = OsmQuestKey(
     ElementType.valueOf(getString(ELEMENT_TYPE)),
     getLong(ELEMENT_ID),
-    getString(QUEST_TYPE).intern()
+    getString(QUEST_TYPE).internString()
 )
 
 private fun CursorPosition.toOsmQuestHiddenAt() = OsmQuestHiddenAt(
