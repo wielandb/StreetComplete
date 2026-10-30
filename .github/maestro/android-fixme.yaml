@@ -5,6 +5,11 @@ name: SCEE FixMe quest form without submitting an edit
     permissions:
       all: allow
 - assertVisible: Menu
+- extendedWaitUntil:
+    visible: Map Attribution
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 5000
 - takeScreenshot: fixme-map
 - tapOn:
     point: "50%,50%"
