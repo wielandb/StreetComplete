@@ -55,10 +55,25 @@ jobs:
             ARCHS=arm64 \
             CODE_SIGNING_ALLOWED=NO \
             build
+          tar -czf iosApp/build/SCEE-simulator.tar.gz \
+            -C iosApp/build/derived-data/Build/Products/Debug-iphonesimulator SCEE.app
 
       - name: Verify the application launches on the iOS simulator
         if: ${{ !cancelled() && steps.build_app.outcome == 'success' }}
         run: bash .github/scripts/ios-smoke.sh
+
+      - name: Exercise onboarding, SCEE settings and map actions
+        timeout-minutes: 20
+        if: ${{ !cancelled() && steps.build_app.outcome == 'success' }}
+        run: bash .github/scripts/ios-ui-smoke.sh
+
+      - name: Preserve the simulator application
+        if: ${{ !cancelled() && steps.build_app.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: iosApp/build/SCEE-simulator.tar.gz
+          retention-days: 14
 
       - name: Preserve native test and build diagnostics
         if: always()

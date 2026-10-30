@@ -1,0 +1,51 @@
+appId: de.westnordost.streetcomplete.expert
+name: SCEE iOS onboarding and expert map controls
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+    arguments:
+      AppleLanguages: "(en)"
+      AppleLocale: en_US
+- repeat:
+    times: 5
+    while:
+      visible: Next
+    commands:
+      - tapOn: Next
+- tapOn: "Let.s go!"
+- assertVisible: Menu
+- takeScreenshot: map-after-onboarding
+- tapOn: Menu
+- tapOn: Settings
+- scrollUntilVisible:
+    element: Show map zoom buttons
+    direction: DOWN
+- tapOn: Show map zoom buttons
+- scrollUntilVisible:
+    element:
+      text: "(?s).*Expert mode.*"
+    direction: DOWN
+- tapOn:
+    text: "(?s).*Expert mode.*"
+- tapOn: Understood
+- takeScreenshot: expert-settings
+- tapOn: Back
+- assertVisible: Zoom in
+- assertVisible: Zoom out
+- tapOn: Zoom in
+- tapOn: Zoom out
+- takeScreenshot: map-with-zoom-controls
+- launchApp:
+    arguments:
+      AppleLanguages: "(en)"
+      AppleLocale: en_US
+- assertVisible: Menu
+- assertVisible: Zoom in
+- longPressOn:
+    point: "50%,45%"
+- assertVisible: Create new track recording
+- assertVisible: Add POI
+- assertVisible: Insert node into way
+- takeScreenshot: expert-map-actions
