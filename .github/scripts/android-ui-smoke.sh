@@ -10,6 +10,10 @@ image="system-images;android-37.0;google_apis_ps16k;x86_64"
 serial=emulator-5554
 package=de.westnordost.streetcomplete.expert.debug
 avd=scee-ci-fixme
+export ANDROID_USER_HOME="$RUNNER_TEMP/scee-android-user"
+export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 if adb -s "$serial" get-state >/dev/null 2>&1; then
     echo "Refusing to use an existing emulator" >&2
@@ -23,6 +27,7 @@ set -o pipefail
 test "$license_status" = 0
 "$sdk_tools/sdkmanager" platform-tools emulator "$image"
 printf 'no\n' | "$sdk_tools/avdmanager" create avd --force --name "$avd" --package "$image"
+emulator -list-avds | grep -Fx "$avd"
 emulator -avd "$avd" -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot \
     -gpu swiftshader -memory 2048 -cores 2 > "$diagnostics/emulator.log" 2>&1 &
 emulator_pid=$!
@@ -44,7 +49,10 @@ for attempt in $(seq 1 120); do
     if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]]; then
         break
     fi
-    kill -0 "$emulator_pid"
+    if ! kill -0 "$emulator_pid" 2>/dev/null; then
+        tail -60 "$diagnostics/emulator.log" >&2
+        exit 1
+    fi
     sleep 2
 done
 test "$(adb -s "$serial" shell getprop ro.boot.qemu.avd_name | tr -d '\r')" = "$avd"
