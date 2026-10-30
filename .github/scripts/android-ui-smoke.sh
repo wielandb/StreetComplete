@@ -58,13 +58,16 @@ done
 test "$(adb -s "$serial" shell getprop ro.boot.qemu.avd_name | tr -d '\r')" = "$avd"
 test "$(adb -s "$serial" shell getprop sys.boot_completed | tr -d '\r')" = 1
 test "$(adb -s "$serial" shell getconf PAGESIZE | tr -d '\r')" = 16384
+adb -s "$serial" shell input keyevent KEYCODE_WAKEUP
+adb -s "$serial" shell wm dismiss-keyguard
 adb -s "$serial" install androidApp/build/ui-apk/androidApp-debug.apk
 adb -s "$serial" shell pm grant "$package" android.permission.ACCESS_COARSE_LOCATION
 adb -s "$serial" shell pm grant "$package" android.permission.ACCESS_FINE_LOCATION
 adb -s "$serial" shell pm grant "$package" android.permission.POST_NOTIFICATIONS
 adb -s "$serial" emu geo fix 13.405 52.52025
-adb -s "$serial" shell am start -W -a android.intent.action.MAIN \
-    -c android.intent.category.LAUNCHER -p "$package"
+adb -s "$serial" shell dumpsys package "$package" > "$diagnostics/package.txt"
+adb -s "$serial" shell am start -W \
+    -n "$package/de.westnordost.streetcomplete.screens.main.MainActivity"
 for attempt in $(seq 1 30); do
     if adb -s "$serial" shell run-as "$package" ls databases/streetcomplete_v2.db >/dev/null 2>&1; then
         break
