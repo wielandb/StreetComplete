@@ -71,6 +71,10 @@ published and iOS CI executed. Pushing this branch enables the prepared Android 
 checks. No main/default/modified branch update is authorized.
 The first push exposed a YAML indentation error in the manual signed-release workflow's
 Java setup. The indentation is corrected and all six active workflow files parse locally.
+The Mac workflow also installs and launches the built SCEE application on an available
+iPhone simulator, checks that its process remains alive after 20 seconds, and preserves a
+screenshot/process listing/system log even when launch verification fails. The simulator
+launch script passes local Bash syntax checking; execution is pending CI.
 This is not release-ready.
 
 The detailed notes below include historical checkpoints; later verified results supersede earlier
