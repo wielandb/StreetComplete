@@ -1,6 +1,8 @@
 # StreetComplete 64 integration
 
-Current verified status (2026-10-30): the merge conflicts are resolved and the merge is still open.
+Current verified status (2026-10-30): merge conflicts are resolved and upstream history is
+merged in `a6431c62868a5e5965fadafb2e21a744cdd72090`. The integration is published on
+`wielandb/StreetComplete:codex/streetcomplete-v64`; Android and Mac CI have started.
 The current Android host suite passes 2,552 tests with one skipped and no failures/errors
 (2,553 cases in 293 suites, repeated after the Android fix in run 18b). Common metadata passes
 with the current source. The current release R8 path passes in run 19 with debug features
@@ -67,6 +69,8 @@ branch of `wielandb/StreetComplete`, and explicitly approved the iOS on-screen z
 No SSH Mac is available. The user explicitly clarified that this separate branch should be
 published and iOS CI executed. Pushing this branch enables the prepared Android and Mac CI
 checks. No main/default/modified branch update is authorized.
+The first push exposed a YAML indentation error in the manual signed-release workflow's
+Java setup. The indentation is corrected and all six active workflow files parse locally.
 This is not release-ready.
 
 The detailed notes below include historical checkpoints; later verified results supersede earlier
