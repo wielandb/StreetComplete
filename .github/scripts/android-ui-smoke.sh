@@ -6,7 +6,7 @@ test "${RUNNER_OS:-}" = Linux
 diagnostics="androidApp/build/smoke"
 mkdir -p "$diagnostics"
 sdk_tools="$ANDROID_HOME/cmdline-tools/latest/bin"
-image="system-images;android-37;google_apis_ps16k;x86_64"
+image="system-images;android-37.0;google_apis_ps16k;x86_64"
 serial=emulator-5554
 package=de.westnordost.streetcomplete.expert.debug
 avd=scee-ci-fixme
